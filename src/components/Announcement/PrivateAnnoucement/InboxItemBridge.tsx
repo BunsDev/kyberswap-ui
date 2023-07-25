@@ -24,7 +24,7 @@ import { MultichainTransferStatus } from 'hooks/bridge/useGetBridgeTransfers'
 import useTheme from 'hooks/useTheme'
 import { formatAmountBridge } from 'pages/Bridge/helpers'
 
-const NetWorkRow = styled.div`
+const NetworkRow = styled.div`
   display: flex;
   align-items: center;
   gap: 4px;
@@ -38,7 +38,7 @@ function InboxItemBridge({
   title,
 }: PrivateAnnouncementProp<AnnouncementTemplateBridge>) {
   const { templateBody, isRead, templateType } = announcement
-  const { status, srcTokenSymbol, srcAmount, dstChainId, srcChainId } = templateBody.transaction
+  const { status, srcTokenSymbol, srcAmount, dstChainId, srcChainId } = templateBody?.transaction || {}
   const isSuccess = Number(status) === MultichainTransferStatus.Success
   const chainIdIn = Number(srcChainId) as ChainId
   const chainIdOut = Number(dstChainId) as ChainId
@@ -68,10 +68,10 @@ function InboxItemBridge({
 
       <InboxItemRow>
         <div style={{ position: 'relative' }}>
-          <NetWorkRow>
+          <NetworkRow>
             <NetworkLogo chainId={chainIdIn} style={{ width: 12, height: 12 }} />
             <PrimaryText color={theme.subText}>{NETWORKS_INFO[chainIdIn].name}</PrimaryText>
-          </NetWorkRow>
+          </NetworkRow>
           <ArrowDown style={{ position: 'absolute', left: 4, height: 10 }} />
         </div>
 
@@ -81,10 +81,10 @@ function InboxItemBridge({
       </InboxItemRow>
 
       <InboxItemRow>
-        <NetWorkRow>
+        <NetworkRow>
           <NetworkLogo chainId={chainIdOut} style={{ width: 12, height: 12 }} />
           <PrimaryText color={theme.subText}>{NETWORKS_INFO[chainIdOut].name}</PrimaryText>
-        </NetWorkRow>
+        </NetworkRow>
         {time}
       </InboxItemRow>
     </InboxItemWrapper>

@@ -1,10 +1,11 @@
 import { ChainId } from '@kyberswap/ks-sdk-core'
-import { t } from '@lingui/macro'
 import { ArrowDown, ArrowUp } from 'react-feather'
 import { Flex, Text } from 'rebass'
 import { CSSProperties } from 'styled-components'
 
-import { AnnouncementTemplatePriceAlert, NotificationType } from 'components/Announcement/type'
+import { SimplePopupProps } from 'components/Announcement/Popups/SimplePopup'
+import { PRIVATE_ANN_TITLE } from 'components/Announcement/PrivateAnnoucement'
+import { AnnouncementTemplatePriceAlert, NotificationType, PrivateAnnouncementType } from 'components/Announcement/type'
 import { Clock } from 'components/Icons'
 import Logo, { NetworkLogo } from 'components/Logo'
 import Row from 'components/Row'
@@ -12,9 +13,13 @@ import { APP_PATHS } from 'constants/index'
 import { NETWORKS_INFO } from 'constants/networks'
 import useTheme from 'hooks/useTheme'
 import { Tab } from 'pages/NotificationCenter/PriceAlerts'
-import { NOTIFICATION_ROUTES, PriceAlertType } from 'pages/NotificationCenter/const'
+import { PROFILE_MANAGE_ROUTES, PriceAlertType } from 'pages/NotificationCenter/const'
 
-const DescriptionPriceAlert = (content: AnnouncementTemplatePriceAlert) => {
+const DescriptionPriceAlert = (
+  content: AnnouncementTemplatePriceAlert,
+  templateType: PrivateAnnouncementType,
+): SimplePopupProps => {
+  const theme = useTheme()
   const {
     chainId: rawChainId,
     tokenInAmount,
@@ -24,16 +29,15 @@ const DescriptionPriceAlert = (content: AnnouncementTemplatePriceAlert) => {
     tokenOutLogoURL,
     threshold,
     type,
-  } = content.alert
+  } = content?.alert || {}
   const chainId = Number(rawChainId) as ChainId
   const logoStyle: CSSProperties = { width: 14, height: 14, borderRadius: '50%' }
-  const theme = useTheme()
   const isAbove = type === PriceAlertType.ABOVE
 
   return {
-    title: t`Price Alert`,
+    title: PRIVATE_ANN_TITLE[templateType] ?? '',
     type: NotificationType.SUCCESS,
-    link: `${APP_PATHS.NOTIFICATION_CENTER}${NOTIFICATION_ROUTES.PRICE_ALERTS}?tab=${Tab.HISTORY}`,
+    link: `${APP_PATHS.PROFILE_MANAGE}${PROFILE_MANAGE_ROUTES.PRICE_ALERTS}?tab=${Tab.HISTORY}`,
     icon: <Clock size={20} />,
     summary: (
       <Row gap="6px" flexWrap={'wrap'} alignItems="center">

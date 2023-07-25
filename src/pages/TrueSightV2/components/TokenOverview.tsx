@@ -292,7 +292,11 @@ export const TokenOverview = ({ data, isLoading }: { data?: ITokenOverview; isLo
                 </MouseoverTooltip>
                 <ShareButton onClick={() => setShowShare(true)} />
               </RowBetween>
-              <KyberScoreMeter value={data?.kyberScore?.score} style={{ width: '211px', height: '128px' }} />
+              <KyberScoreMeter
+                key={data ? data.symbol + data.address : undefined}
+                value={data?.kyberScore?.score}
+                style={{ width: '211px', height: '128px' }}
+              />
               <RowFit gap="6px" marginBottom="12px">
                 <Text
                   fontSize={24}
@@ -333,6 +337,7 @@ export const TokenOverview = ({ data, isLoading }: { data?: ITokenOverview; isLo
                       </>
                     )
                   }
+                  disableTooltip={data?.symbol === 'KNC'}
                   placement="top"
                 >
                   <Icon id="timer" size={16} />
@@ -478,7 +483,7 @@ export const TokenOverview = ({ data, isLoading }: { data?: ITokenOverview; isLo
             <Text
               color={theme.red}
               fontSize="12px"
-              backgroundColor={rgba(theme.red, 0.2)}
+              backgroundColor={rgba(data && data.price24hChangePercent > 0 ? theme.primary : theme.red, 0.2)}
               display="inline"
               padding="4px 8px"
               style={{ borderRadius: '16px' }}

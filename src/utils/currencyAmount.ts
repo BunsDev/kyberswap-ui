@@ -6,17 +6,9 @@ import { basisPointsToPercent } from 'utils'
 export const minimumAmountAfterSlippage = (amount: CurrencyAmount<Currency>, slippage: number | Percent) => {
   const slippagePercent = typeof slippage === 'number' ? basisPointsToPercent(slippage) : slippage
 
-  const slippageAdjustedAmount = new Fraction(JSBI.BigInt(1))
-    .add(slippagePercent)
-    .invert()
-    .multiply(amount.quotient).quotient
-  return TokenAmount.fromRawAmount(amount.currency, slippageAdjustedAmount)
-}
-
-export const maximumAmountAfterSlippage = (amount: CurrencyAmount<Currency>, slippage: Percent) => {
-  const slippagePercent = typeof slippage === 'number' ? basisPointsToPercent(slippage) : slippage
-
-  const slippageAdjustedAmount = new Fraction(JSBI.BigInt(1)).add(slippagePercent).multiply(amount.quotient).quotient
+  const slippageAdjustedAmount = new Fraction(amount.quotient).multiply(
+    new Fraction(JSBI.BigInt(1)).subtract(slippagePercent),
+  ).quotient
   return TokenAmount.fromRawAmount(amount.currency, slippageAdjustedAmount)
 }
 

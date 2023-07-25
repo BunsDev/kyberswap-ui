@@ -6,7 +6,7 @@ import dayjs from 'dayjs'
 import JSBI from 'jsbi'
 import Numeral from 'numeral'
 
-import { GET_BLOCK, GET_BLOCKS } from 'apollo/queries'
+import { GET_BLOCKS } from 'apollo/queries'
 import { BLOCK_SERVICE_API, ENV_KEY } from 'constants/env'
 import { DEFAULT_GAS_LIMIT_MARGIN, ZERO_ADDRESS } from 'constants/index'
 import { NETWORKS_INFO, NETWORKS_INFO_CONFIG, isEVM } from 'constants/networks'
@@ -133,7 +133,7 @@ const formatDollarFractionAmount = (num: number, digits: number) => {
   return formatter.format(num)
 }
 
-export const formatDollarSignificantAmount = (num: number, minDigits: number, maxDigits?: number) => {
+const formatDollarSignificantAmount = (num: number, minDigits: number, maxDigits?: number) => {
   const formatter = new Intl.NumberFormat(['en-US'], {
     style: 'currency',
     currency: 'USD',
@@ -252,6 +252,7 @@ export async function splitQuery<ResultType, T, U>(
   localClient: ApolloClient<NormalizedCacheObject>,
   list: T[],
   vars: U[],
+  signal: AbortSignal,
   skipCount = 100,
 ): Promise<
   | {
@@ -272,6 +273,11 @@ export async function splitQuery<ResultType, T, U>(
     const result = await localClient.query({
       query: query(sliced, ...vars),
       fetchPolicy: 'no-cache',
+      context: {
+        fetchOptions: {
+          signal,
+        },
+      },
     })
     fetchedData = {
       ...fetchedData,
@@ -288,29 +294,6 @@ export async function splitQuery<ResultType, T, U>(
 }
 
 /**
- * @notice Fetches first block after a given timestamp
- * @dev Query speed is optimized by limiting to a 600-second period
- * @param {Int} timestamp in seconds
- */
-export async function getBlockFromTimestamp(
-  timestamp: number,
-  chainId: ChainId,
-  blockClient: ApolloClient<NormalizedCacheObject>,
-) {
-  if (!isEVM(chainId)) return
-  const result = await blockClient.query({
-    query: GET_BLOCK,
-    variables: {
-      timestampFrom: timestamp,
-      timestampTo: timestamp + 600,
-    },
-    fetchPolicy: 'cache-first',
-  })
-
-  return result?.data?.blocks?.[0]?.number
-}
-
-/**
  * @notice Fetches block objects for an array of timestamps.
  * @dev blocks are returned in chronological order (ASC) regardless of input.
  * @dev blocks are returned at string representations of Int
@@ -321,13 +304,20 @@ export async function getBlocksFromTimestampsSubgraph(
   blockClient: ApolloClient<NormalizedCacheObject>,
   timestamps: number[],
   chainId: ChainId,
+  signal: AbortSignal,
 ): Promise<{ timestamp: number; number: number }[]> {
   if (!isEVM(chainId)) return []
   if (timestamps?.length === 0) {
     return []
   }
 
-  const fetchedData = await splitQuery<{ number: string }[], number, any>(GET_BLOCKS, blockClient, timestamps, [])
+  const fetchedData = await splitQuery<{ number: string }[], number, any>(
+    GET_BLOCKS,
+    blockClient,
+    timestamps,
+    [],
+    signal,
+  )
   const blocks: { timestamp: number; number: number }[] = []
   if (fetchedData) {
     for (const t in fetchedData) {
@@ -346,6 +336,7 @@ export async function getBlocksFromTimestampsSubgraph(
 export async function getBlocksFromTimestampsBlockService(
   timestamps: number[],
   chainId: ChainId,
+  signal: AbortSignal,
 ): Promise<{ timestamp: number; number: number }[]> {
   if (!isEVM(chainId)) return []
   if (timestamps?.length === 0) {
@@ -360,6 +351,7 @@ export async function getBlocksFromTimestampsBlockService(
               `${BLOCK_SERVICE_API}/${
                 NETWORKS_INFO[chainId].aggregatorRoute
               }/api/v1/block?timestamps=${timestampsChunk.join(',')}`,
+              { signal },
             )
           ).json() as Promise<{ data: { timestamp: number; number: number }[] }>,
       ),
@@ -377,9 +369,10 @@ export async function getBlocksFromTimestamps(
   blockClient: ApolloClient<NormalizedCacheObject>,
   timestamps: number[],
   chainId: ChainId,
+  signal: AbortSignal,
 ): Promise<{ timestamp: number; number: number }[]> {
-  if (isEnableBlockService) return getBlocksFromTimestampsBlockService(timestamps, chainId)
-  return getBlocksFromTimestampsSubgraph(blockClient, timestamps, chainId)
+  if (isEnableBlockService) return getBlocksFromTimestampsBlockService(timestamps, chainId, signal)
+  return getBlocksFromTimestampsSubgraph(blockClient, timestamps, chainId, signal)
 }
 
 /**
@@ -398,6 +391,15 @@ export const get24hValue = (valueNow: string, value24HoursAgo: string | undefine
 }
 
 export const getTokenLogoURL = (inputAddress: string, chainId: ChainId): string => {
+  //  hardcode for testing in goerli
+  if (chainId === ChainId.GÖRLI) {
+    switch (inputAddress.toLowerCase()) {
+      case '0x1bbeeedcf32dc2c1ebc2f138e3fc7f3decd44d6a':
+        return 'https://s2.coinmarketcap.com/static/img/coins/64x64/4943.png'
+      case '0x2bf64acf7ead856209749d0d125e9ade2d908e7f':
+        return 'https://seeklogo.com/images/T/tether-usdt-logo-FA55C7F397-seeklogo.com.png'
+    }
+  }
   let address = inputAddress
   if (address === ZERO_ADDRESS) {
     address = WETH[chainId].address
@@ -445,9 +447,8 @@ export const deleteUnique = <T>(array: T[] | undefined, element: T): T[] => {
   return array
 }
 
-export const isEVMWallet = (wallet: WalletInfo): wallet is EVMWalletInfo =>
-  !!(wallet as EVMWalletInfo).connector || !!(wallet as EVMWalletInfo).href
-export const isSolanaWallet = (wallet: WalletInfo): wallet is SolanaWalletInfo => !!(wallet as SolanaWalletInfo).adapter
+export const isEVMWallet = (wallet?: WalletInfo): wallet is EVMWalletInfo => !!wallet && 'connector' in wallet
+export const isSolanaWallet = (wallet?: WalletInfo): wallet is SolanaWalletInfo => !!wallet && 'adapter' in wallet
 
 enum WALLET_KEYS {
   COIN98 = 'COIN98',

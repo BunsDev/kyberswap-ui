@@ -17,7 +17,7 @@ import {
   PROMM_GET_POOL_VALUES_AFTER_BURNS_SUCCESS,
   PROMM_GET_POOL_VALUES_AFTER_MINTS_SUCCESS,
 } from 'apollo/queries/promm'
-import { ELASTIC_BASE_FEE_UNIT } from 'constants/index'
+import { APP_PATHS, ELASTIC_BASE_FEE_UNIT } from 'constants/index'
 import { NETWORKS_INFO } from 'constants/networks'
 import { useActiveWeb3React } from 'hooks'
 import { AppDispatch, AppState } from 'state'
@@ -27,11 +27,14 @@ import { Field } from 'state/swap/actions'
 import { useInputCurrency, useOutputCurrency, useSwapState } from 'state/swap/hooks'
 import { modifyTransaction } from 'state/transactions/actions'
 import { TRANSACTION_TYPE, TransactionDetails, TransactionExtraInfo2Token } from 'state/transactions/type'
-import { useUserSlippageTolerance } from 'state/user/hooks'
+import { useIsWhiteListKyberAI, useUserSlippageTolerance } from 'state/user/hooks'
 
 export enum MIXPANEL_TYPE {
   PAGE_VIEWED,
   WALLET_CONNECTED,
+  WALLET_CONNECT_CLICK,
+  WALLET_CONNECT_ACCEPT_TERM_CLICK,
+  WALLET_CONNECT_WALLET_CLICK,
   SWAP_INITIATED,
   SWAP_CONFIRMED,
   SWAP_COMPLETED,
@@ -138,6 +141,11 @@ export enum MIXPANEL_TYPE {
   TUTORIAL_CLICK_DENY,
   TUTORIAL_VIEW_VIDEO_SWAP,
 
+  // MEV Protection
+  MEV_CLICK_ADD_MEV,
+  MEV_ADD_CLICK_MODAL,
+  MEV_ADD_RESULT,
+
   // type and swap
   TAS_TYPING_KEYWORD,
   TAS_SELECT_PAIR,
@@ -221,6 +229,7 @@ export enum MIXPANEL_TYPE {
 
   // KyberAI
   KYBERAI_SHARE_TOKEN_CLICK,
+  KYBERAI_GET_STARTED_CLICK,
   KYBERAI_RANKING_SWITCH_CHAIN_CLICK,
   KYBERAI_SEARCH_TOKEN_SUCCESS,
   KYBERAI_SUBSCRIBE_CLICK,
@@ -237,16 +246,21 @@ export enum MIXPANEL_TYPE {
   KYBERAI_EXPLORING_SWITCH_TRADE_TYPE_CLICK,
   KYBERAI_EXPLORING_SWITCH_TIMEFRAME_CLICK,
   KYBERAI_SWAP_INSIGHT_CLICK,
-  KYBERAI_SWAP_ABOUT_CLICK,
   KYBERAI_POOL_INSIGHT_CLICK,
-  KYBERAI_POOL_POPUP_INSIGHT,
   KYBERAI_POOL_EXPLORE_TOKEN_IN_POPUP_INSIGHT,
-  KYBERAI_TIMESPENT,
   KYBERAI_EXPAND_WIDGET_CLICK,
   KYBERAI_TAB_VIEW,
   KYBERAI_JOIN_KYBER_WAITLIST_CLICK,
   KYBERAI_AWESOME_CLICK,
   KYBERAI_SWAP_CLICK,
+
+  // cross chain
+  CROSS_CHAIN_CLICK_DISCLAIMER,
+  CROSS_CHAIN_SWAP_INIT,
+  CROSS_CHAIN_SWAP_CONFIRMED,
+  CROSS_CHAIN_CLICK_DISCLAIMER_CHECKBOX,
+  CROSS_CHAIN_TXS_SUBMITTED,
+  CROSS_CHAIN_CLICK_SUBSCRIBE,
 }
 
 export const NEED_CHECK_SUBGRAPH_TRANSACTION_TYPES: readonly TRANSACTION_TYPE[] = [
@@ -267,6 +281,7 @@ type FeeInfo = {
 
 export default function useMixpanel(currencies?: { [field in Field]?: Currency }) {
   const { chainId, account, isEVM, networkInfo } = useActiveWeb3React()
+  const { isWhiteList } = useIsWhiteListKyberAI()
   const { saveGas } = useSwapState()
   const network = networkInfo.name
 
@@ -286,15 +301,39 @@ export default function useMixpanel(currencies?: { [field in Field]?: Currency }
 
   const mixpanelHandler = useCallback(
     (type: MIXPANEL_TYPE, payload?: any) => {
-      if (!account) {
-        return
-      }
+      // Anonymous events
       switch (type) {
         case MIXPANEL_TYPE.PAGE_VIEWED: {
           const { page } = payload
           page && mixpanel.track(page + ' Page Viewed')
           break
         }
+        case MIXPANEL_TYPE.WALLET_CONNECT_CLICK: {
+          mixpanel.track('Wallet Connect - Connect Wallet Button Click')
+          break
+        }
+        case MIXPANEL_TYPE.WALLET_CONNECT_ACCEPT_TERM_CLICK: {
+          mixpanel.track('Wallet Connect - Accept term button click')
+          break
+        }
+        case MIXPANEL_TYPE.WALLET_CONNECT_WALLET_CLICK: {
+          mixpanel.track('Wallet Connect - Wallet click', payload)
+          break
+        }
+        case MIXPANEL_TYPE.CHAIN_SWITCHED: {
+          const { old_network, new_network } = payload
+          mixpanel.track('Chain Switched', {
+            old_network,
+            new_network,
+          })
+          break
+        }
+      }
+      if (!account) {
+        return
+      }
+      // Need connect wallet events
+      switch (type) {
         case MIXPANEL_TYPE.WALLET_CONNECTED:
           mixpanel.register({ wallet_address: account, platform: isMobile ? 'Mobile' : 'Web', network })
           mixpanel.track('Wallet Connected', { source: location.pathname })
@@ -496,12 +535,16 @@ export default function useMixpanel(currencies?: { [field in Field]?: Currency }
           })
           break
         }
-        case MIXPANEL_TYPE.CHAIN_SWITCHED: {
-          const { old_network, new_network } = payload
-          mixpanel.track('Chain Switched', {
-            old_network,
-            new_network,
-          })
+        case MIXPANEL_TYPE.MEV_CLICK_ADD_MEV: {
+          mixpanel.track('MEV Protection - Click add MEV protection')
+          break
+        }
+        case MIXPANEL_TYPE.MEV_ADD_CLICK_MODAL: {
+          mixpanel.track('MEV Protection -  MEV protection type click', payload)
+          break
+        }
+        case MIXPANEL_TYPE.MEV_ADD_RESULT: {
+          mixpanel.track('MEV Protection -  Add MEV protection result', payload)
           break
         }
         case MIXPANEL_TYPE.CREATE_POOL_INITITATED: {
@@ -1168,98 +1211,37 @@ export default function useMixpanel(currencies?: { [field in Field]?: Currency }
           mixpanel.track('Accept New Amount Button Click', payload)
           break
         }
-        case MIXPANEL_TYPE.KYBERAI_SHARE_TOKEN_CLICK: {
-          mixpanel.track('KyberAI - Share token click', payload)
+
+        case MIXPANEL_TYPE.CROSS_CHAIN_CLICK_DISCLAIMER: {
+          mixpanel.track('Cross-chain - Disclaimer click')
           break
         }
-        case MIXPANEL_TYPE.KYBERAI_RANKING_SWITCH_CHAIN_CLICK: {
-          mixpanel.track('KyberAI - Ranking - Switch chain click', payload)
+        case MIXPANEL_TYPE.CROSS_CHAIN_CLICK_DISCLAIMER_CHECKBOX: {
+          mixpanel.track('Cross chain - Disclaimer checkbox click')
           break
         }
-        case MIXPANEL_TYPE.KYBERAI_SEARCH_TOKEN_SUCCESS: {
-          mixpanel.track('KyberAI - Search token success', payload)
+        case MIXPANEL_TYPE.CROSS_CHAIN_CLICK_SUBSCRIBE: {
+          mixpanel.track('Cross chain - Subscribe click')
           break
         }
-        case MIXPANEL_TYPE.KYBERAI_SUBSCRIBE_CLICK: {
-          mixpanel.track('KyberAI - Subscribe', payload)
+        case MIXPANEL_TYPE.CROSS_CHAIN_SWAP_INIT: {
+          mixpanel.track('Cross chain - Swap Initiated', payload)
           break
         }
-        case MIXPANEL_TYPE.KYBERAI_RANKING_ACTION_CLICK: {
-          mixpanel.track('KyberAI - Ranking - Action click', payload)
+        case MIXPANEL_TYPE.CROSS_CHAIN_SWAP_CONFIRMED: {
+          mixpanel.track('Cross chain - Swap Confirmed', payload)
           break
         }
-        case MIXPANEL_TYPE.KYBERAI_ADD_TOKEN_TO_WATCHLIST: {
-          mixpanel.track('KyberAI - Add token to watchlist', payload)
+        case MIXPANEL_TYPE.CROSS_CHAIN_TXS_SUBMITTED: {
+          mixpanel.track('Cross chain - Transaction Submitted', payload)
           break
         }
-        case MIXPANEL_TYPE.KYBERAI_RANKING_CATEGORY_CLICK: {
-          mixpanel.track('KyberAI - Ranking - Category click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPLORING_SWAP_TOKEN_CLICK: {
-          mixpanel.track('KyberAI - Exploring - Swap token click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPLORING_VIEW_ALL_CLICK: {
-          mixpanel.track('KyberAI - Exploring - View all click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPLORING_ANALYSIS_TYPE_CLICK: {
-          mixpanel.track('KyberAI - Exploring - Analysis type click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPLORING_DISPLAY_SETTING_CLICK: {
-          mixpanel.track('KyberAI - Exploring - Display setting click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPLORING_CHANGE_DISPLAY_SETTING: {
-          mixpanel.track('KyberAI - Exploring - Change display setting', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPLORING_FULL_SCREEN_CLICK: {
-          mixpanel.track('KyberAI - Exploring - Full screen click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPLORING_SHARE_CHART_CLICK: {
-          mixpanel.track('KyberAI - Exploring - Share chart click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPLORING_SWITCH_TRADE_TYPE_CLICK: {
-          mixpanel.track('KyberAI - Exploring - Switch trade type click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPLORING_SWITCH_TIMEFRAME_CLICK: {
-          mixpanel.track('KyberAI - Exploring - Switch timeframe click', payload)
-          break
-        }
+
         case MIXPANEL_TYPE.KYBERAI_SWAP_INSIGHT_CLICK: {
           mixpanel.track('KyberAI - Swap insight click', payload)
           break
         }
-        case MIXPANEL_TYPE.KYBERAI_SWAP_ABOUT_CLICK: {
-          mixpanel.track('KyberAI - Swap - About Click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_POOL_INSIGHT_CLICK: {
-          mixpanel.track('KyberAI - Pool insight click', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_POOL_POPUP_INSIGHT: {
-          mixpanel.track('KyberAI - Pool - Popup insight', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_POOL_EXPLORE_TOKEN_IN_POPUP_INSIGHT: {
-          mixpanel.track('KyberAI - Pool - Explore token on popup insight', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_TIMESPENT: {
-          mixpanel.track('KyberAI - Timespent', payload)
-          break
-        }
-        case MIXPANEL_TYPE.KYBERAI_EXPAND_WIDGET_CLICK: {
-          mixpanel.track('KyberAI - Expand widget click', payload)
-          break
-        }
+
         case MIXPANEL_TYPE.KYBERAI_TAB_VIEW: {
           mixpanel.track('KyberAI Tab View', payload)
           break
@@ -1273,9 +1255,106 @@ export default function useMixpanel(currencies?: { [field in Field]?: Currency }
           break
         }
       }
+
+      // Whitelist protected events
+      if (isWhiteList) {
+        switch (type) {
+          case MIXPANEL_TYPE.KYBERAI_SHARE_TOKEN_CLICK: {
+            mixpanel.track('KyberAI - Share token click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_GET_STARTED_CLICK: {
+            mixpanel.track('KyberAI - Click Get Started', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_RANKING_SWITCH_CHAIN_CLICK: {
+            mixpanel.track('KyberAI - Ranking - Switch chain click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_SEARCH_TOKEN_SUCCESS: {
+            mixpanel.track('KyberAI - Search token success', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_SUBSCRIBE_CLICK: {
+            mixpanel.track('KyberAI - Subscribe', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_RANKING_ACTION_CLICK: {
+            mixpanel.track('KyberAI - Ranking - Action click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_ADD_TOKEN_TO_WATCHLIST: {
+            mixpanel.track('KyberAI - Add token to watchlist', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_RANKING_CATEGORY_CLICK: {
+            mixpanel.track('KyberAI - Ranking - Category click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPLORING_SWAP_TOKEN_CLICK: {
+            mixpanel.track('KyberAI - Exploring - Swap token click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPLORING_VIEW_ALL_CLICK: {
+            mixpanel.track('KyberAI - Exploring - View all click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPLORING_ANALYSIS_TYPE_CLICK: {
+            mixpanel.track('KyberAI - Exploring - Analysis type click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPLORING_DISPLAY_SETTING_CLICK: {
+            mixpanel.track('KyberAI - Exploring - Display setting click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPLORING_CHANGE_DISPLAY_SETTING: {
+            mixpanel.track('KyberAI - Exploring - Change display setting', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPLORING_FULL_SCREEN_CLICK: {
+            mixpanel.track('KyberAI - Exploring - Full screen click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPLORING_SHARE_CHART_CLICK: {
+            mixpanel.track('KyberAI - Exploring - Share chart click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPLORING_SWITCH_TRADE_TYPE_CLICK: {
+            mixpanel.track('KyberAI - Exploring - Switch trade type click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPLORING_SWITCH_TIMEFRAME_CLICK: {
+            mixpanel.track('KyberAI - Exploring - Switch timeframe click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_POOL_INSIGHT_CLICK: {
+            mixpanel.track('KyberAI - Pool insight click', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_POOL_EXPLORE_TOKEN_IN_POPUP_INSIGHT: {
+            mixpanel.track('KyberAI - Pool - Explore token on popup insight', payload)
+            break
+          }
+          case MIXPANEL_TYPE.KYBERAI_EXPAND_WIDGET_CLICK: {
+            mixpanel.track('KyberAI - Expand widget click', payload)
+            break
+          }
+          default:
+            break
+        }
+      }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currencies, network, saveGas, account, mixpanel.hasOwnProperty('get_distinct_id'), ethPrice?.currentPrice],
+    /* eslint-disable */
+    [
+      currencies,
+      network,
+      saveGas,
+      account,
+      mixpanel.hasOwnProperty('get_distinct_id'),
+      ethPrice?.currentPrice,
+      isWhiteList,
+    ],
+    /* eslint-enable */
   )
   const subgraphMixpanelHandler = useCallback(
     async (transaction: TransactionDetails) => {
@@ -1410,8 +1489,8 @@ export default function useMixpanel(currencies?: { [field in Field]?: Currency }
             )
               break
           }
-          const { totalValueLockedToken0, totalValueLockedToken1, totalValueLockedUSD, feeTier } = res.data.pool
-          const burn = res.data.pool.burns.find((burn: { id: string }) => burn.id.startsWith(transaction.hash))
+          const { totalValueLockedToken0, totalValueLockedToken1, totalValueLockedUSD, feeTier } = res?.data?.pool || {}
+          const burn = res.data?.pool?.burns?.find((burn: { id: string }) => burn.id.startsWith(transaction.hash))
           mixpanelHandler(MIXPANEL_TYPE.ELASTIC_REMOVE_LIQUIDITY_COMPLETED, {
             token_1_pool_qty: totalValueLockedToken0,
             token_2_pool_qty: totalValueLockedToken1,
@@ -1484,8 +1563,9 @@ export default function useMixpanel(currencies?: { [field in Field]?: Currency }
 }
 
 export const useGlobalMixpanelEvents = () => {
-  const { account, chainId } = useActiveWeb3React()
+  const { account, chainId, isEVM } = useActiveWeb3React()
   const { mixpanelHandler } = useMixpanel()
+  const { isWhiteList } = useIsWhiteListKyberAI()
   const oldNetwork = usePrevious(chainId)
   const location = useLocation()
   const pathName = useMemo(() => {
@@ -1494,7 +1574,7 @@ export const useGlobalMixpanelEvents = () => {
   }, [location])
 
   useEffect(() => {
-    if (account && isAddress(account)) {
+    if (isEVM ? account && isAddress(account) : account) {
       mixpanel.identify(account)
 
       const getQueryParam = (url: string, param: string) => {
@@ -1533,7 +1613,7 @@ export const useGlobalMixpanelEvents = () => {
       mixpanelHandler(MIXPANEL_TYPE.WALLET_CONNECTED)
     }
     return () => {
-      if (mixpanel.hasOwnProperty('persistence')) {
+      if (account) {
         mixpanel.reset()
       }
     }
@@ -1574,13 +1654,18 @@ export const useGlobalMixpanelEvents = () => {
         '/kyberdao/stake-knc': 'KyberDAO Stake',
         '/kyberdao/vote': 'KyberDAO Vote',
         limit: 'Limit Order',
+        'cross-chain': 'Cross Chain',
         'notification-center': 'Notification',
-        '/KyberAI/About': 'KyberAI About',
-        '/KyberAI/Rankings': 'KyberAI Rankings',
-        '/KyberAI/Explore': 'KyberAI Explore',
+        [APP_PATHS.KYBERAI_ABOUT]: 'KyberAI About',
+      }
+      const protectedPaths: { [key: string]: string } = {
+        [APP_PATHS.KYBERAI_RANKINGS]: 'KyberAI Rankings',
+        [APP_PATHS.KYBERAI_EXPLORE]: 'KyberAI Explore',
       }
       const pageName = map[pathName] || map[location.pathname]
+      const protectedPageName = protectedPaths[pathName] || protectedPaths[location.pathname]
       pageName && mixpanelHandler(MIXPANEL_TYPE.PAGE_VIEWED, { page: pageName })
+      protectedPageName && isWhiteList && mixpanelHandler(MIXPANEL_TYPE.PAGE_VIEWED, { page: protectedPageName })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathName, account, chainId, location.pathname])

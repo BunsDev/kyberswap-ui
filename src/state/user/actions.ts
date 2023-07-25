@@ -3,7 +3,7 @@ import { createAction } from '@reduxjs/toolkit'
 
 import { SupportedLocale } from 'constants/locales'
 
-import { VIEW_MODE } from './reducer'
+import { CrossChainSetting, VIEW_MODE } from './reducer'
 
 export interface SerializedToken {
   chainId: number
@@ -28,6 +28,10 @@ export const updateUserLocale = createAction<{ userLocale: SupportedLocale }>('u
 export const updateUserSlippageTolerance = createAction<{ userSlippageTolerance: number }>(
   'user/updateUserSlippageTolerance',
 )
+export const updateUserSlippageToleranceForLineaTestnet = createAction<{ userSlippageTolerance: number }>(
+  'user/updateUserSlippageToleranceForLineaTestnet',
+)
+
 export const updateUserDeadline = createAction<{ userDeadline: number }>('user/updateUserDeadline')
 export const addSerializedToken = createAction<{ serializedToken: SerializedToken }>('user/addSerializedToken')
 export const removeSerializedToken = createAction<{ chainId: number; address: string }>('user/removeSerializedToken')
@@ -35,7 +39,7 @@ export const addSerializedPair = createAction<{ serializedPair: SerializedPair }
 export const removeSerializedPair = createAction<{ chainId: number; tokenAAddress: string; tokenBAddress: string }>(
   'user/removeSerializedPair',
 )
-export const toggleLiveChart = createAction<{ chainId: number }>('user/toggleLiveChart')
+export const toggleLiveChart = createAction('user/toggleLiveChart')
 
 export const toggleTradeRoutes = createAction<void>('user/toggleTradeRoutes')
 export const toggleTokenInfo = createAction<void>('user/toggleTokenInfo')
@@ -48,7 +52,6 @@ export type ToggleFavoriteTokenPayload = {
 } & ({ isNative?: false; address: string } | { isNative: true; address?: never })
 export const toggleFavoriteToken = createAction<ToggleFavoriteTokenPayload>('user/toggleFavoriteToken')
 export const updateChainId = createAction<ChainId>('user/updateChainId')
-export const updateIsUserManuallyDisconnect = createAction<boolean>('user/updateIsUserManuallyDisconnect')
 export const updateTokenAnalysisSettings = createAction<string>('user/updateTokenAnalysisSettings')
 export const updateAcceptedTermVersion = createAction<number | null>('user/updateAcceptedTermVersion')
 export const changeViewMode = createAction<VIEW_MODE>('user/changeViewMode')
@@ -65,3 +68,5 @@ export const revokePermit = createAction<{ chainId: number; address: string; acc
 export const permitError = createAction<{ chainId: number; address: string; account: string }>('user/permitError')
 export const pinSlippageControl = createAction<boolean>('user/pinSlippageControl')
 export const toggleKyberAIWidget = createAction<void>('user/toggleKyberAIWidget')
+
+export const setCrossChainSetting = createAction<CrossChainSetting>('user/setCrossChainSetting')

@@ -23,7 +23,7 @@ import TransactionConfirmationModal, {
   ConfirmationModalContent,
   TransactionErrorContent,
 } from 'components/TransactionConfirmationModal'
-import { AMP_HINT } from 'constants/index'
+import { AMP_HINT, APP_PATHS } from 'constants/index'
 import { EVMNetworkInfo } from 'constants/networks/type'
 import { NativeCurrencies } from 'constants/tokens'
 import { PairState } from 'data/Reserves'
@@ -31,12 +31,12 @@ import { useActiveWeb3React, useWeb3React } from 'hooks'
 import { useCurrency } from 'hooks/Tokens'
 import { ApprovalState, useApproveCallback } from 'hooks/useApproveCallback'
 import useTheme from 'hooks/useTheme'
-import useTokensMarketPrice from 'hooks/useTokensMarketPrice'
 import useTransactionDeadline from 'hooks/useTransactionDeadline'
 import { Dots, Wrapper } from 'pages/Pool/styleds'
-import { useTokensPrice, useWalletModalToggle } from 'state/application/hooks'
+import { useWalletModalToggle } from 'state/application/hooks'
 import { Field } from 'state/mint/actions'
 import { useDerivedMintInfo, useMintActionHandlers, useMintState } from 'state/mint/hooks'
+import { useTokenPrices } from 'state/tokenPrices/hooks'
 import { useTransactionAdder } from 'state/transactions/hooks'
 import { TRANSACTION_TYPE } from 'state/transactions/type'
 import { useDegenModeManager, usePairAdderByTokens, useUserSlippageTolerance } from 'state/user/hooks'
@@ -360,18 +360,22 @@ const TokenPair = ({
     () => [currencies[Field.CURRENCY_A], currencies[Field.CURRENCY_B]].map(currency => currency?.wrapped),
     [currencies],
   )
+  const tokenAddresses: string[] = useMemo(
+    () => tokens.map(token => token?.address as string).filter(item => !!item),
+    [tokens],
+  )
 
-  const usdPrices = useTokensPrice(tokens)
-  const marketPrices = useTokensMarketPrice(tokens)
+  const marketPriceMap = useTokenPrices(tokenAddresses)
+  const marketPrices = tokens.map(item => marketPriceMap[item?.address || ''] || 0)
 
   const estimatedUsdCurrencyA =
-    parsedAmounts[Field.CURRENCY_A] && usdPrices[0]
-      ? parseFloat((parsedAmounts[Field.CURRENCY_A] as CurrencyAmount<Currency>).toSignificant(6)) * usdPrices[0]
+    parsedAmounts[Field.CURRENCY_A] && marketPrices[0]
+      ? parseFloat((parsedAmounts[Field.CURRENCY_A] as CurrencyAmount<Currency>).toSignificant(6)) * marketPrices[0]
       : 0
 
   const estimatedUsdCurrencyB =
-    parsedAmounts[Field.CURRENCY_B] && usdPrices[1]
-      ? parseFloat((parsedAmounts[Field.CURRENCY_B] as CurrencyAmount<Currency>).toSignificant(6)) * usdPrices[1]
+    parsedAmounts[Field.CURRENCY_B] && marketPrices[1]
+      ? parseFloat((parsedAmounts[Field.CURRENCY_B] as CurrencyAmount<Currency>).toSignificant(6)) * marketPrices[1]
       : 0
 
   const poolPrice = Number(price?.toSignificant(6))
@@ -447,7 +451,7 @@ const TokenPair = ({
                     <StyledInternalLink
                       onClick={handleDismissConfirmation}
                       id="unamplified-pool-link"
-                      to={`/add/${currencyIdA}/${currencyIdB}/${unAmplifiedPairAddress}`}
+                      to={`/${networkInfo.route}${APP_PATHS.CLASSIC_ADD_LIQ}/${currencyIdA}/${currencyIdB}/${unAmplifiedPairAddress}`}
                     >
                       Go to unamplified pool
                     </StyledInternalLink>
@@ -483,7 +487,7 @@ const TokenPair = ({
                 onSwitchCurrency={() => {
                   chainId &&
                     navigate(
-                      `/add/${
+                      `/${networkInfo.route}${APP_PATHS.CLASSIC_ADD_LIQ}/${
                         currencyAIsETHER ? WETH[chainId].address : NativeCurrencies[chainId].symbol
                       }/${currencyIdB}/${pairAddress}`,
                       { replace: true },
@@ -492,7 +496,11 @@ const TokenPair = ({
               />
               <Flex justifyContent="space-between" alignItems="center" marginTop="0.5rem">
                 <USDPrice>
-                  {usdPrices[0] ? `1 ${nativeA?.symbol} = ${formattedNum(usdPrices[0].toString(), true)}` : <Loader />}
+                  {marketPrices[0] ? (
+                    `1 ${nativeA?.symbol} = ${formattedNum(marketPrices[0].toString(), true)}`
+                  ) : (
+                    <Loader />
+                  )}
                 </USDPrice>
               </Flex>
             </div>
@@ -515,13 +523,17 @@ const TokenPair = ({
               />
               <Flex justifyContent="space-between" alignItems="center" marginTop="0.5rem">
                 <USDPrice>
-                  {usdPrices[1] ? `1 ${nativeB?.symbol} = ${formattedNum(usdPrices[1].toString(), true)}` : <Loader />}
+                  {marketPrices[1] ? (
+                    `1 ${nativeB?.symbol} = ${formattedNum(marketPrices[1].toString(), true)}`
+                  ) : (
+                    <Loader />
+                  )}
                 </USDPrice>
 
                 {pairAddress && chainId && (currencyBIsWETH || currencyBIsETHER) && (
                   <StyledInternalLink
                     replace
-                    to={`/add/${currencyIdA}/${
+                    to={`/${networkInfo.route}${APP_PATHS.CLASSIC_ADD_LIQ}/${currencyIdA}/${
                       currencyBIsETHER ? WETH[chainId].address : NativeCurrencies[chainId].symbol
                     }/${pairAddress}`}
                   >

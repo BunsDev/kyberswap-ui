@@ -31,3 +31,15 @@ export const wallet = {
   checkboxAcceptTerm: '[data-testid=accept-term]',
   statusConnected: '[data-testid=web3-status-connected]',
 }
+
+export const network = {
+  btnSelectNetwork: '[data-testid=select-network]',
+  btnNetwork: '[data-testid=network-button]',
+}
+
+export const menu = {
+  earnMenu: '[data-testid=earn-menu]',
+  poolMenu: '[data-testid=pools-nav-link]',
+  myPoolMenu: '[data-testid=my-pools-nav-link]',
+  farmMenu: '[data-testid=farms-nav-link]',
+}

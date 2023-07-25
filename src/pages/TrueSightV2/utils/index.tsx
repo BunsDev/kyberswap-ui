@@ -36,6 +36,8 @@ export const formatShortNum = (num: number, fixed = 1): string => {
     formattedNum = (+(absNum / 1000).toFixed(fixed)).toString() + 'K'
   } else if (absNum >= 1) {
     formattedNum = (+absNum.toFixed(fixed)).toString()
+  } else if (absNum > 0 && absNum <= 0.00001) {
+    return '<0.00001'
   } else {
     formattedNum = (+absNum.toPrecision(fixed)).toString()
   }
@@ -74,7 +76,7 @@ export const formatTokenPrice = (num: number, fixed?: number): string => {
 export const isReferrerCodeInvalid = (error: any) => error?.data?.code === 4040
 
 const mapErr: { [key: number]: string } = {
-  4004: t`OTP wrong or expired. Please try again.`,
+  4004: t`Verification code is wrong or expired. Please try again.`,
   4040: t`Referral code is invalid`,
   4090: t`This email address is already registered`,
 }

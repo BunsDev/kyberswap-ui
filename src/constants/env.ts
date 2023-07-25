@@ -21,7 +21,6 @@ export const BLOCK_SERVICE_API = required('BLOCK_SERVICE_API')
 export const PRICE_CHART_API = required('PRICE_CHART_API')
 export const AGGREGATOR_STATS_API = required('AGGREGATOR_STATS_API')
 export const NOTIFICATION_API = required('NOTIFICATION_API')
-export const TRUESIGHT_API = required('TRUESIGHT_API')
 export const TRANSAK_URL = required('TRANSAK_URL')
 export const TRANSAK_API_KEY = required('TRANSAK_API_KEY')
 export const TYPE_AND_SWAP_URL = required('TYPE_AND_SWAP_URL')
@@ -44,12 +43,14 @@ export const LIMIT_ORDER_API_READ = required('LIMIT_ORDER_API_READ')
 export const LIMIT_ORDER_API_WRITE = required('LIMIT_ORDER_API_WRITE')
 export const KYBER_DAO_STATS_API = required('KYBER_DAO_STATS_API')
 
-export const PRICE_ALERT_API = required('PRICE_ALERT_API')
 export const OAUTH_CLIENT_ID = required('OAUTH_CLIENT_ID')
 export const BFF_API = required('BFF_API')
 export const KYBER_AI_REFERRAL_ID = required('KYBER_AI_REFERRAL_ID')
 export const KYBER_AI_TOPIC_ID = required('KYBER_AI_TOPIC_ID')
+export const PRICE_ALERT_TOPIC_ID = required('PRICE_ALERT_TOPIC_ID')
+export const ELASTIC_POOL_TOPIC_ID = required('ELASTIC_POOL_TOPIC_ID')
 export const BUCKET_NAME = required('BUCKET_NAME')
+export const WALLETCONNECT_PROJECT_ID = required('WALLETCONNECT_PROJECT_ID')
 
 type FirebaseConfig = {
   apiKey: string
@@ -59,6 +60,7 @@ type FirebaseConfig = {
   messagingSenderId: string
   databaseURL?: string
   appId: string
+  measurementId?: string
 }
 
 export const FIREBASE: { [key: string]: { DEFAULT: FirebaseConfig; LIMIT_ORDER?: FirebaseConfig } } = {
@@ -72,12 +74,13 @@ export const FIREBASE: { [key: string]: { DEFAULT: FirebaseConfig; LIMIT_ORDER?:
       appId: '1:522790089501:web:524403003ae65c09c727f4',
     },
     DEFAULT: {
-      apiKey: 'AIzaSyCuEREEsq8e2eW9fs4FGhdPImekcLCG7bc',
-      authDomain: 'notification-dev-4a732.firebaseapp.com',
-      projectId: 'notification-dev-4a732',
-      storageBucket: 'notification-dev-4a732.appspot.com',
-      messagingSenderId: '38521816648',
-      appId: '1:38521816648:web:0daa7524ed7b53837fba7d',
+      apiKey: 'AIzaSyD1UhS2D-a5D6e20SuKgx87FGitbQUL_V8',
+      authDomain: 'notification-local-73771.firebaseapp.com',
+      projectId: 'notification-local-73771',
+      storageBucket: 'notification-local-73771.appspot.com',
+      messagingSenderId: '227120017035',
+      appId: '1:227120017035:web:36592ab3e81b5614b7ae8e',
+      measurementId: 'G-Q3EPQSWMM5',
     },
   },
   staging: {
@@ -112,28 +115,31 @@ export const FIREBASE: { [key: string]: { DEFAULT: FirebaseConfig; LIMIT_ORDER?:
 
 const ANNOUNCEMENT_TEMPLATE_IDS: { [key: string]: { [type: string]: string } } = {
   development: {
-    [PrivateAnnouncementType.PRICE_ALERT]: '44,45',
+    [PrivateAnnouncementType.PRICE_ALERT]: '53',
     [PrivateAnnouncementType.LIMIT_ORDER]: '8,9,10,11,33,34,35,36',
     [PrivateAnnouncementType.BRIDGE_ASSET]: '37,38',
+    [PrivateAnnouncementType.CROSS_CHAIN]: '48,49',
     [PrivateAnnouncementType.KYBER_AI]: '46',
     [PrivateAnnouncementType.ELASTIC_POOLS]: '39,40',
-    EXCLUDE: '2,29,1,47,50',
+    EXCLUDE: '2,29,1,47,50,44,45',
   },
   staging: {
-    [PrivateAnnouncementType.PRICE_ALERT]: '22,23',
+    [PrivateAnnouncementType.PRICE_ALERT]: '30',
     [PrivateAnnouncementType.LIMIT_ORDER]: '14,15,16,17',
     [PrivateAnnouncementType.BRIDGE_ASSET]: '12,13',
+    [PrivateAnnouncementType.CROSS_CHAIN]: '25,26',
     [PrivateAnnouncementType.KYBER_AI]: '27',
     [PrivateAnnouncementType.ELASTIC_POOLS]: '20,21',
-    EXCLUDE: '2,11,1,28,29',
+    EXCLUDE: '2,11,1,28,29,22,23',
   },
   production: {
-    [PrivateAnnouncementType.PRICE_ALERT]: '21,22',
+    [PrivateAnnouncementType.PRICE_ALERT]: '29',
     [PrivateAnnouncementType.LIMIT_ORDER]: '12,13,14,15',
     [PrivateAnnouncementType.BRIDGE_ASSET]: '10,11',
+    [PrivateAnnouncementType.CROSS_CHAIN]: '27,28',
     [PrivateAnnouncementType.KYBER_AI]: '26',
     [PrivateAnnouncementType.ELASTIC_POOLS]: '17,18',
-    EXCLUDE: '2,16,19,9,25,24',
+    EXCLUDE: '2,16,19,9,25,24,21,22',
   },
 }
 
@@ -146,3 +152,10 @@ export const getAnnouncementsTemplateIds = (type: PrivateAnnouncementType | 'EXC
 const mock = localStorage.getItem('mock')?.split(',') ?? []
 export const MOCK_ACCOUNT_EVM = mock[0] ?? ''
 export const MOCK_ACCOUNT_SOLANA = mock[1] ?? ''
+
+const isSupportTestNet = ENV_LEVEL < ENV_TYPE.PROD && new URLSearchParams(window.location.search).get('test')
+export const CROSS_CHAIN_CONFIG = {
+  AXELAR_SCAN_URL: isSupportTestNet ? 'https://testnet.axelarscan.io/gmp/' : 'https://axelarscan.io/gmp/',
+  API_DOMAIN: isSupportTestNet ? 'https://testnet.api.0xsquid.com' : 'https://api.0xsquid.com',
+  INTEGRATOR_ID: 'kyberswap-api',
+}

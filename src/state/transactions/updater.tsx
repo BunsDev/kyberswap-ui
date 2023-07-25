@@ -6,9 +6,9 @@ import { useDispatch, useSelector } from 'react-redux'
 
 import { NotificationType } from 'components/Announcement/type'
 import { APP_PATHS } from 'constants/index'
-import { useActiveWeb3React, useWeb3React, useWeb3Solana } from 'hooks'
+import { useActiveWeb3React, useWeb3Solana } from 'hooks'
 import useMixpanel, { MIXPANEL_TYPE, NEED_CHECK_SUBGRAPH_TRANSACTION_TYPES } from 'hooks/useMixpanel'
-import { useBlockNumber, useTransactionNotify } from 'state/application/hooks'
+import { useBlockNumber, useKyberSwapConfig, useTransactionNotify } from 'state/application/hooks'
 import { useSetClaimingCampaignRewardId } from 'state/campaigns/hooks'
 import { AppDispatch, AppState } from 'state/index'
 import { revokePermit } from 'state/user/actions'
@@ -42,7 +42,7 @@ function shouldCheck(
 
 export default function Updater(): null {
   const { chainId, isEVM, isSolana, account } = useActiveWeb3React()
-  const { library } = useWeb3React()
+  const { readProvider } = useKyberSwapConfig(chainId)
   const { connection } = useWeb3Solana()
 
   const lastBlockNumber = useBlockNumber()
@@ -60,7 +60,7 @@ export default function Updater(): null {
   const setClaimingCampaignRewardId = useSetClaimingCampaignRewardId()[1]
 
   useEffect(() => {
-    if (!library || !lastBlockNumber) return
+    if (!readProvider || !lastBlockNumber) return
     const uniqueTransactions = [
       ...new Set(
         Object.values(transactions)
@@ -77,126 +77,124 @@ export default function Updater(): null {
       .forEach(hash => {
         if (isEVM) {
           // Check if tx was replaced
-          library
+          readProvider
             .getTransaction(hash)
             .then(res => {
               const transaction = findTx(transactions, hash)
-              if (!transaction) return
+              if (!transaction || !res) return // !res this mean tx was drop
+
               const { sentAtBlock, from, to, nonce, data } = transaction
-              // this mean tx was drop
-              if (res === null) {
-                if (sentAtBlock && from && to && nonce && data)
-                  findReplacementTx(library, sentAtBlock, {
-                    from,
-                    to,
-                    nonce,
-                    data,
+              if (sentAtBlock && from && to && nonce && data)
+                findReplacementTx(readProvider, sentAtBlock, {
+                  from,
+                  to,
+                  nonce,
+                  data,
+                })
+                  .then(newTx => {
+                    if (newTx) {
+                      dispatch(
+                        replaceTx({
+                          chainId,
+                          oldHash: hash,
+                          newHash: newTx.hash,
+                        }),
+                      )
+                    }
                   })
-                    .then(newTx => {
-                      if (newTx) {
-                        dispatch(
-                          replaceTx({
-                            chainId,
-                            oldHash: hash,
-                            newHash: newTx.hash,
-                          }),
-                        )
-                      }
-                    })
-                    .catch(() => {
-                      dispatch(removeTx({ chainId, hash }))
-                    })
-                else {
-                  dispatch(removeTx({ chainId, hash }))
-                }
+                  .catch(() => {
+                    dispatch(removeTx({ chainId, hash }))
+                  })
+              else {
+                dispatch(removeTx({ chainId, hash }))
               }
             })
             .catch(console.warn)
-          library
+          readProvider
             .getTransactionReceipt(hash)
             .then(receipt => {
-              if (receipt) {
-                const transaction = findTx(transactions, receipt.transactionHash)
-                if (!transaction) return
-                dispatch(
-                  finalizeTransaction({
-                    chainId,
-                    hash: receipt.transactionHash,
-                    receipt: {
-                      blockHash: receipt.blockHash,
-                      status: receipt.status,
-                    },
-                    needCheckSubgraph: includes(NEED_CHECK_SUBGRAPH_TRANSACTION_TYPES, transaction.type),
-                  }),
-                )
-
-                transactionNotify({
-                  hash: receipt.transactionHash,
-                  type: receipt.status === 1 ? NotificationType.SUCCESS : NotificationType.ERROR,
-                })
-                if (receipt.status === 1 && transaction) {
-                  const arbitrary = transaction.extraInfo?.arbitrary
-                  switch (transaction.type) {
-                    case TRANSACTION_TYPE.SWAP: {
-                      if (arbitrary) {
-                        if (account && arbitrary.isPermitSwap) {
-                          dispatch(revokePermit({ chainId, address: arbitrary.inputAddress, account }))
-                        }
-                        mixpanelHandler(MIXPANEL_TYPE.SWAP_COMPLETED, {
-                          arbitrary,
-                          actual_gas: receipt.gasUsed || BigNumber.from(0),
-                          gas_price: receipt.effectiveGasPrice || BigNumber.from(0),
-                          tx_hash: receipt.transactionHash,
-                          feeInfo: arbitrary.feeInfo,
-                        })
-                      }
-                      break
-                    }
-                    case TRANSACTION_TYPE.BRIDGE: {
-                      if (arbitrary) {
-                        mixpanelHandler(MIXPANEL_TYPE.BRIDGE_TRANSACTION_SUBMIT, {
-                          ...arbitrary,
-                          tx_hash: receipt.transactionHash,
-                        })
-                      }
-                      break
-                    }
-                    case TRANSACTION_TYPE.ELASTIC_COLLECT_FEE: {
-                      if (arbitrary) {
-                        mixpanelHandler(MIXPANEL_TYPE.ELASTIC_COLLECT_FEES_COMPLETED, arbitrary)
-                      }
-                      break
-                    }
-                    case TRANSACTION_TYPE.ELASTIC_INCREASE_LIQUIDITY: {
-                      if (arbitrary) {
-                        mixpanelHandler(MIXPANEL_TYPE.ELASTIC_INCREASE_LIQUIDITY_COMPLETED, {
-                          ...arbitrary,
-                          tx_hash: receipt.transactionHash,
-                        })
-                      }
-                      break
-                    }
-                    case TRANSACTION_TYPE.CLAIM_REWARD: {
-                      // claim campaign reward successfully
-                      // reset id claiming when finished
-                      if (window.location.pathname.startsWith(APP_PATHS.CAMPAIGN)) setClaimingCampaignRewardId(null)
-                      break
-                    }
-                    case TRANSACTION_TYPE.CANCEL_LIMIT_ORDER: {
-                      if (arbitrary) {
-                        mixpanelHandler(MIXPANEL_TYPE.LO_CANCEL_ORDER_SUBMITTED, {
-                          ...arbitrary,
-                          tx_hash: receipt.transactionHash,
-                        })
-                      }
-                      break
-                    }
-                    default:
-                      break
-                  }
-                }
-              } else {
+              if (!receipt) {
                 dispatch(checkedTransaction({ chainId, hash, blockNumber: lastBlockNumber }))
+                return
+              }
+
+              const transaction = findTx(transactions, receipt.transactionHash)
+              if (!transaction) return
+              dispatch(
+                finalizeTransaction({
+                  chainId,
+                  hash: receipt.transactionHash,
+                  receipt: {
+                    blockHash: receipt.blockHash,
+                    status: receipt.status,
+                  },
+                  needCheckSubgraph: includes(NEED_CHECK_SUBGRAPH_TRANSACTION_TYPES, transaction.type),
+                }),
+              )
+
+              transactionNotify({
+                hash: receipt.transactionHash,
+                type: receipt.status === 1 ? NotificationType.SUCCESS : NotificationType.ERROR,
+              })
+              if (receipt.status === 1) {
+                const arbitrary = transaction.extraInfo?.arbitrary
+                switch (transaction.type) {
+                  case TRANSACTION_TYPE.SWAP: {
+                    if (!arbitrary) return
+                    if (account && arbitrary.isPermitSwap) {
+                      dispatch(revokePermit({ chainId, address: arbitrary.inputAddress, account }))
+                    }
+                    mixpanelHandler(MIXPANEL_TYPE.SWAP_COMPLETED, {
+                      arbitrary,
+                      actual_gas: receipt.gasUsed || BigNumber.from(0),
+                      gas_price: receipt.effectiveGasPrice || BigNumber.from(0),
+                      tx_hash: receipt.transactionHash,
+                      feeInfo: arbitrary.feeInfo,
+                    })
+                    break
+                  }
+                  case TRANSACTION_TYPE.BRIDGE: {
+                    if (arbitrary) {
+                      mixpanelHandler(MIXPANEL_TYPE.BRIDGE_TRANSACTION_SUBMIT, {
+                        ...arbitrary,
+                        tx_hash: receipt.transactionHash,
+                      })
+                    }
+                    break
+                  }
+                  case TRANSACTION_TYPE.ELASTIC_COLLECT_FEE: {
+                    if (arbitrary) {
+                      mixpanelHandler(MIXPANEL_TYPE.ELASTIC_COLLECT_FEES_COMPLETED, arbitrary)
+                    }
+                    break
+                  }
+                  case TRANSACTION_TYPE.ELASTIC_INCREASE_LIQUIDITY: {
+                    if (arbitrary) {
+                      mixpanelHandler(MIXPANEL_TYPE.ELASTIC_INCREASE_LIQUIDITY_COMPLETED, {
+                        ...arbitrary,
+                        tx_hash: receipt.transactionHash,
+                      })
+                    }
+                    break
+                  }
+                  case TRANSACTION_TYPE.CLAIM_REWARD: {
+                    // claim campaign reward successfully
+                    // reset id claiming when finished
+                    if (window.location.pathname.startsWith(APP_PATHS.CAMPAIGN)) setClaimingCampaignRewardId(null)
+                    break
+                  }
+                  case TRANSACTION_TYPE.CANCEL_LIMIT_ORDER: {
+                    if (arbitrary) {
+                      mixpanelHandler(MIXPANEL_TYPE.LO_CANCEL_ORDER_SUBMITTED, {
+                        ...arbitrary,
+                        tx_hash: receipt.transactionHash,
+                      })
+                    }
+                    break
+                  }
+                  default:
+                    break
+                }
               }
             })
             .catch((error: any) => {
@@ -265,7 +263,7 @@ export default function Updater(): null {
       })
 
     // eslint-disable-next-line
-  }, [chainId, library, transactions, lastBlockNumber, dispatch, connection])
+  }, [chainId, readProvider, transactions, lastBlockNumber, dispatch, connection])
 
   return null
 }

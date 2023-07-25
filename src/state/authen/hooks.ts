@@ -1,41 +1,35 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useSelector } from 'react-redux'
 
-import { useActiveWeb3React } from 'hooks'
 import { AppState } from 'state'
-import { updatePossibleWalletAddress, updateProcessingLogin, updateProfile } from 'state/authen/actions'
-import { AuthenState, UserProfile } from 'state/authen/reducer'
+import { AuthenState, AutoSignIn, UserProfile, authenActions } from 'state/authen/reducer'
 import { useAppDispatch } from 'state/hooks'
 
-export function useConnectedWallet(): [string | null | undefined, (data: string | null | undefined) => void] {
+const { setConfirmChangeProfile, updateConnectingWallet, updateProcessingLogin, setAutoSignIn } = authenActions
+
+// connecting metamask ...
+export function useIsConnectingWallet(): [boolean, (data: boolean) => void] {
   const dispatch = useAppDispatch()
-  const wallet = useSelector((state: AppState) => state.authen.possibleConnectedWalletAddress)
+  const connectingWallet = useSelector((state: AppState) => state.authen.isConnectingWallet)
 
   const setConnectedWallet = useCallback(
-    (data: string | null | undefined) => {
-      dispatch(updatePossibleWalletAddress(data))
+    (data: boolean) => {
+      dispatch(updateConnectingWallet(data))
     },
     [dispatch],
   )
 
-  return [wallet, setConnectedWallet]
+  return [connectingWallet, setConnectedWallet]
 }
 
-export function useSessionInfo(): AuthenState {
-  const { account } = useActiveWeb3React()
+// info relate profile, session
+export function useSessionInfo(): AuthenState & { userInfo: UserProfile | undefined } {
   const authen = useSelector((state: AppState) => state.authen)
-  const isLogin = Boolean(authen.isLogin && account)
-  return { ...authen, isLogin }
-}
-
-export const useSaveUserProfile = () => {
-  const dispatch = useAppDispatch()
-  return useCallback(
-    ({ profile, isAnonymous = false }: { profile: UserProfile | undefined; isAnonymous?: boolean }) => {
-      dispatch(updateProfile({ profile, isAnonymous }))
-    },
-    [dispatch],
+  const userInfo = useMemo(
+    () => (authen.isLogin ? authen.signedUserInfo : authen.anonymousUserInfo),
+    [authen.signedUserInfo, authen.anonymousUserInfo, authen.isLogin],
   )
+  return { ...authen, userInfo }
 }
 
 export const useSetPendingAuthentication = () => {
@@ -46,4 +40,28 @@ export const useSetPendingAuthentication = () => {
     },
     [dispatch],
   )
+}
+
+export const useSetConfirmChangeProfile = () => {
+  const dispatch = useAppDispatch()
+  return useCallback(
+    (value: boolean) => {
+      dispatch(setConfirmChangeProfile(value))
+    },
+    [dispatch],
+  )
+}
+
+export function useIsAutoLoginAfterConnectWallet(): [AutoSignIn, (v: AutoSignIn) => void] {
+  const dispatch = useAppDispatch()
+  const autoSignIn = useSelector((state: AppState) => state.authen.autoSignIn)
+
+  const setAutoSignInAfterConnect = useCallback(
+    (data: AutoSignIn) => {
+      dispatch(setAutoSignIn(data))
+    },
+    [dispatch],
+  )
+
+  return [autoSignIn, setAutoSignInAfterConnect]
 }

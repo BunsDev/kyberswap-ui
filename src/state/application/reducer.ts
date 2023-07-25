@@ -19,7 +19,6 @@ import {
   setSubscribedNotificationTopic,
   updateBlockNumber,
   updateETHPrice,
-  updateKNCPrice,
   updatePrommETHPrice,
   updateServiceWorker,
 } from './actions'
@@ -46,16 +45,11 @@ interface ApplicationState {
   readonly openModal: ApplicationModal | null
   readonly ethPrice: ETHPrice
   readonly prommEthPrice: ETHPrice
-  readonly kncPrice?: string
   readonly serviceWorkerRegistration: ServiceWorkerRegistration | null
 
   readonly notification: {
     isLoading: boolean
     topicGroups: Topic[]
-    userInfo: {
-      email: string
-      telegram: string
-    }
     announcementDetail: {
       selectedIndex: number | null // current announcement
       announcements: AnnouncementTemplatePopup[]
@@ -70,7 +64,6 @@ interface ApplicationState {
 const initialStateNotification = {
   isLoading: false,
   topicGroups: [],
-  userInfo: { email: '', telegram: '' },
   announcementDetail: {
     selectedIndex: null,
     announcements: [],
@@ -87,13 +80,13 @@ export const initialStateConfirmModal = {
   onConfirm: undefined,
   onCancel: undefined,
 }
+
 const initialState: ApplicationState = {
   blockNumber: {},
   popupList: [],
   openModal: null,
   ethPrice: {},
   prommEthPrice: {},
-  kncPrice: '',
   serviceWorkerRegistration: null,
   notification: initialStateNotification,
   config: {},
@@ -144,26 +137,24 @@ export default createReducer(initialState, builder =>
       state.ethPrice.oneDayBackPrice = oneDayBackPrice
       state.ethPrice.pricePercentChange = pricePercentChange
     })
-    .addCase(updateKNCPrice, (state, { payload: kncPrice }) => {
-      state.kncPrice = kncPrice
-    })
+
     .addCase(updateServiceWorker, (state, { payload }) => {
       state.serviceWorkerRegistration = payload
     })
     .addCase(setConfirmData, (state, { payload }) => {
       state.confirmModal = payload
     })
+
     // ------ notification subscription ------
     .addCase(setLoadingNotification, (state, { payload: isLoading }) => {
       const notification = state.notification ?? initialStateNotification
       state.notification = { ...notification, isLoading }
     })
-    .addCase(setSubscribedNotificationTopic, (state, { payload: { topicGroups, userInfo } }) => {
+    .addCase(setSubscribedNotificationTopic, (state, { payload: { topicGroups } }) => {
       const notification = state.notification ?? initialStateNotification
       state.notification = {
         ...notification,
         topicGroups: topicGroups ?? notification.topicGroups,
-        userInfo: userInfo ?? notification.userInfo,
       }
     })
     .addCase(setAnnouncementDetail, (state, { payload }) => {
@@ -176,7 +167,7 @@ export default createReducer(initialState, builder =>
     })
 
     .addMatcher(ksSettingApi.endpoints.getKyberswapConfiguration.matchFulfilled, (state, action) => {
-      const { chainId } = action.meta.arg.originalArgs
+      const chainId = action.meta.arg.originalArgs
       const evm = isEVM(chainId)
       const data = action.payload.data.config
       const rpc = data?.rpc || NETWORKS_INFO[chainId].defaultRpcUrl
@@ -191,7 +182,9 @@ export default createReducer(initialState, builder =>
         : ethereumInfo.classic.defaultSubgraph
 
       const elasticSubgraph = evm
-        ? data?.elasticSubgraph || NETWORKS_INFO[chainId].elastic.defaultSubgraph
+        ? NETWORKS_INFO[chainId].elastic.defaultSubgraph ||
+          data?.elasticSubgraph ||
+          NETWORKS_INFO[chainId].elastic.defaultSubgraph
         : ethereumInfo.elastic.defaultSubgraph
 
       if (!state.config) state.config = {}

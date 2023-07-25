@@ -1,21 +1,21 @@
 import { Fraction } from '@kyberswap/ks-sdk-core'
 import JSBI from 'jsbi'
 
-import { EPSILON, RESERVE_USD_DECIMALS } from 'constants/index'
+import { RESERVE_USD_DECIMALS } from 'constants/index'
 
 // using a currency library here in case we want to add more in future
 export const formatDollarAmount = (num: number | undefined, digits = 2) => {
   if (num === 0) return '$0.00'
   if (!num) return '-'
-  if (num < 0.001 && digits <= 3) {
-    return '<$0.001'
+  if (num < 0.01 && digits <= 3) {
+    return '<$0.01'
   }
   const fractionDigits = num > 1000 ? 2 : digits
   return Intl.NumberFormat('en-US', {
-    notation: 'compact',
+    notation: num < 10_000_000 ? 'standard' : 'compact',
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: fractionDigits,
+    minimumFractionDigits: 0,
     maximumFractionDigits: fractionDigits,
   })
     .format(num)
@@ -37,10 +37,6 @@ export const formatNotDollarAmount = (num: number | undefined, digits = 2) => {
   })
     .format(num)
     .toLowerCase()
-}
-
-export function isEqual(a: number, b: number, ep = EPSILON) {
-  return Math.abs(a - b) < ep
 }
 
 // https://stackoverflow.com/a/1685917/8153505

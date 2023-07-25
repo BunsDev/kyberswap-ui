@@ -35,6 +35,7 @@ import {
   LanguageCode,
   ResolutionString,
 } from 'components/TradingViewChart/charting_library'
+import { getTradingViewTimeZone } from 'components/TradingViewChart/utils'
 import { useActiveWeb3React } from 'hooks'
 import useTheme from 'hooks/useTheme'
 import { KYBERAI_CHART_ID, NETWORK_TO_CHAINID } from 'pages/TrueSightV2/constants'
@@ -45,10 +46,10 @@ import {
   useNetflowToCEXQuery,
   useNetflowToWhaleWalletsQuery,
   useNumberOfHoldersQuery,
-  useTokenDetailQuery,
   useTradingVolumeQuery,
   useTransferInformationQuery,
 } from 'pages/TrueSightV2/hooks/useKyberAIData'
+import useKyberAITokenOverview from 'pages/TrueSightV2/hooks/useKyberAITokenOverview'
 import { defaultExplorePageToken } from 'pages/TrueSightV2/pages/SingleToken'
 import { TechnicalAnalysisContext } from 'pages/TrueSightV2/pages/TechnicalAnalysis'
 import {
@@ -384,7 +385,7 @@ export const NumberofTradesChart = ({ noAnimation }: { noAnimation?: boolean }) 
   const above768 = useMedia(`(min-width: ${MEDIA_WIDTHS.upToSmall}px)`)
   const textFontSize = above768 ? '12px' : '10px'
   return (
-    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data}>
+    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data && data.length > 0}>
       <InfoWrapper>
         <Column gap="4px">
           <Text color={theme.subText}>Timeframe</Text>
@@ -697,7 +698,7 @@ export const TradingVolumeChart = ({ noAnimation }: { noAnimation?: boolean }) =
   const above768 = useMedia(`(min-width: ${MEDIA_WIDTHS.upToSmall}px)`)
   const textFontSize = above768 ? '12px' : '10px'
   return (
-    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data}>
+    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data && data.length > 0}>
       <InfoWrapper>
         <Column gap="4px">
           <Text color={theme.subText}>Timeframe</Text>
@@ -1098,7 +1099,7 @@ export const NetflowToWhaleWallets = ({ tab, noAnimation }: { tab?: ChartTab; no
   const textFontSize = above768 ? '12px' : '10px'
 
   return (
-    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data}>
+    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data && data.length > 0}>
       {account ? (
         <>
           <InfoWrapper>
@@ -1282,7 +1283,7 @@ export const NetflowToWhaleWallets = ({ tab, noAnimation }: { tab?: ChartTab; no
               <Bar
                 dataKey="inflow"
                 stackId="a"
-                fill={rgba(theme.primary, 0.6)}
+                fill={rgba(theme.red, 0.6)}
                 isAnimationActive={noAnimation ? false : true}
                 animationBegin={ANIMATION_DELAY}
                 animationDuration={ANIMATION_DURATION}
@@ -1291,7 +1292,7 @@ export const NetflowToWhaleWallets = ({ tab, noAnimation }: { tab?: ChartTab; no
               <Bar
                 dataKey="outflow"
                 stackId="a"
-                fill={rgba(theme.red, 0.6)}
+                fill={rgba(theme.primary, 0.6)}
                 isAnimationActive={noAnimation ? false : true}
                 animationBegin={ANIMATION_DELAY}
                 animationDuration={ANIMATION_DURATION}
@@ -1320,7 +1321,7 @@ export const NetflowToWhaleWallets = ({ tab, noAnimation }: { tab?: ChartTab; no
         <Row justify="center" gap="16px" style={{ position: 'absolute', bottom: 0 }}>
           <LegendButton
             text="Inflow"
-            iconStyle={{ backgroundColor: rgba(theme.primary, 0.6) }}
+            iconStyle={{ backgroundColor: rgba(theme.red, 0.6) }}
             enabled={showInflow}
             onClick={() =>
               dispatch({ type: CHART_STATES_ACTION_TYPE.TOGGLE_OPTION, payload: { option: 'showInflow' } })
@@ -1328,7 +1329,7 @@ export const NetflowToWhaleWallets = ({ tab, noAnimation }: { tab?: ChartTab; no
           />
           <LegendButton
             text="Outflow"
-            iconStyle={{ backgroundColor: rgba(theme.red, 0.6) }}
+            iconStyle={{ backgroundColor: rgba(theme.primary, 0.6) }}
             enabled={showOutflow}
             onClick={() =>
               dispatch({ type: CHART_STATES_ACTION_TYPE.TOGGLE_OPTION, payload: { option: 'showOutflow' } })
@@ -1497,7 +1498,7 @@ export const NetflowToCentralizedExchanges = ({ tab, noAnimation }: { tab?: Char
   const above768 = useMedia(`(min-width: ${MEDIA_WIDTHS.upToSmall}px)`)
   const textFontSize = above768 ? '12px' : '10px'
   return (
-    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data}>
+    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data && data.length > 0}>
       <InfoWrapper>
         <Column gap="4px">
           <Text color={theme.subText}>Timeframe</Text>
@@ -1529,7 +1530,7 @@ export const NetflowToCentralizedExchanges = ({ tab, noAnimation }: { tab?: Char
           <>
             <LegendButton
               text="Inflow"
-              iconStyle={{ backgroundColor: rgba(theme.primary, 0.6) }}
+              iconStyle={{ backgroundColor: rgba(theme.red, 0.6) }}
               enabled={showInflow}
               onClick={() =>
                 dispatch({ type: CHART_STATES_ACTION_TYPE.TOGGLE_OPTION, payload: { option: 'showInflow' } })
@@ -1537,7 +1538,7 @@ export const NetflowToCentralizedExchanges = ({ tab, noAnimation }: { tab?: Char
             />
             <LegendButton
               text="Outflow"
-              iconStyle={{ backgroundColor: rgba(theme.red, 0.6) }}
+              iconStyle={{ backgroundColor: rgba(theme.primary, 0.6) }}
               enabled={showOutflow}
               onClick={() =>
                 dispatch({ type: CHART_STATES_ACTION_TYPE.TOGGLE_OPTION, payload: { option: 'showOutflow' } })
@@ -1664,7 +1665,7 @@ export const NetflowToCentralizedExchanges = ({ tab, noAnimation }: { tab?: Char
           <Bar
             dataKey="totalInflow"
             stackId="a"
-            fill={rgba(theme.primary, 0.6)}
+            fill={rgba(theme.red, 0.6)}
             isAnimationActive={noAnimation ? false : true}
             animationBegin={ANIMATION_DELAY}
             animationDuration={ANIMATION_DURATION}
@@ -1673,7 +1674,7 @@ export const NetflowToCentralizedExchanges = ({ tab, noAnimation }: { tab?: Char
           <Bar
             dataKey="totalOutflow"
             stackId="a"
-            fill={rgba(theme.red, 0.6)}
+            fill={rgba(theme.primary, 0.6)}
             isAnimationActive={noAnimation ? false : true}
             animationBegin={ANIMATION_DELAY}
             animationDuration={ANIMATION_DURATION}
@@ -1698,7 +1699,7 @@ export const NetflowToCentralizedExchanges = ({ tab, noAnimation }: { tab?: Char
         <Row justify="center" gap="16px" style={{ position: 'absolute', bottom: 0 }}>
           <LegendButton
             text="Inflow"
-            iconStyle={{ backgroundColor: rgba(theme.primary, 0.6) }}
+            iconStyle={{ backgroundColor: rgba(theme.red, 0.6) }}
             enabled={showInflow}
             onClick={() =>
               dispatch({ type: CHART_STATES_ACTION_TYPE.TOGGLE_OPTION, payload: { option: 'showInflow' } })
@@ -1706,7 +1707,7 @@ export const NetflowToCentralizedExchanges = ({ tab, noAnimation }: { tab?: Char
           />
           <LegendButton
             text="Outflow"
-            iconStyle={{ backgroundColor: rgba(theme.red, 0.6) }}
+            iconStyle={{ backgroundColor: rgba(theme.primary, 0.6) }}
             enabled={showOutflow}
             onClick={() =>
               dispatch({ type: CHART_STATES_ACTION_TYPE.TOGGLE_OPTION, payload: { option: 'showOutflow' } })
@@ -1761,12 +1762,15 @@ export const NumberofTransfers = ({ tab }: { tab: ChartTab }) => {
     return [from, now, timerange]
   }, [timeframe])
 
-  const { data, isLoading } = useTransferInformationQuery({
-    chain,
-    address,
-    from,
-    to,
-  })
+  const { data, isLoading } = useTransferInformationQuery(
+    {
+      chain,
+      address,
+      from,
+      to,
+    },
+    { skip: !chain || !address },
+  )
   const formattedData = useMemo(() => {
     if (!data || data.length === 0) {
       dispatch({ type: CHART_STATES_ACTION_TYPE.NO_DATA, payload: { value: true } })
@@ -1805,7 +1809,7 @@ export const NumberofTransfers = ({ tab }: { tab: ChartTab }) => {
   const textFontSize = above768 ? '12px' : '10px'
 
   return (
-    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data}>
+    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data && data.length > 0}>
       <InfoWrapper>
         <Column gap="4px">
           <Text color={theme.subText}>Timeframe</Text>
@@ -1941,12 +1945,15 @@ export const NumberofHolders = () => {
       }[timeframe as string] || 604800)
     return [from, now, timerange]
   }, [timeframe])
-  const { data, isLoading } = useNumberOfHoldersQuery({
-    chain,
-    address,
-    from,
-    to,
-  })
+  const { data, isLoading } = useNumberOfHoldersQuery(
+    {
+      chain,
+      address,
+      from,
+      to,
+    },
+    { skip: !chain || !address },
+  )
 
   const formattedData = useMemo(() => {
     if (!data || data.length === 0) {
@@ -1982,7 +1989,7 @@ export const NumberofHolders = () => {
   const above768 = useMedia(`(min-width: ${MEDIA_WIDTHS.upToSmall}px)`)
   const textFontSize = above768 ? '12px' : '10px'
   return (
-    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data}>
+    <LoadingHandleWrapper isLoading={isLoading} hasData={!!data && data.length > 0}>
       <InfoWrapper>
         <Column gap="4px">
           <Text color={theme.subText}>Timeframe</Text>
@@ -2241,12 +2248,15 @@ export const LiquidOnCentralizedExchanges = ({ noAnimation }: { noAnimation?: bo
       }[timeframe as string] || 604800)
     return [from, now, timerange]
   }, [timeframe])
-  const { data, isLoading } = useCexesLiquidationQuery({
-    tokenAddress: address,
-    chartSize: timeframe.toString().toLowerCase(),
-    chain,
-  })
-  const { data: tokenOverview } = useTokenDetailQuery({ address, chain }, { skip: !address || !chain })
+  const { data, isLoading } = useCexesLiquidationQuery(
+    {
+      tokenAddress: address,
+      chartSize: timeframe.toString().toLowerCase(),
+      chain,
+    },
+    { skip: !address || !chain },
+  )
+  const { data: tokenOverview } = useKyberAITokenOverview()
   const [showLong, setShowLong] = useState(true)
   const [showShort, setShowShort] = useState(true)
   const [showPrice, setShowPrice] = useState(true)
@@ -2597,11 +2607,7 @@ export const Prochart = ({
   const [fullscreen, setFullscreen] = useState(false)
   const [loading, setLoading] = useState(false)
   const userLocale = useUserLocale()
-  const { chain, address } = useParams()
-  const { data } = useTokenDetailQuery({
-    chain: chain || defaultExplorePageToken.chain,
-    address: address || defaultExplorePageToken.address,
-  })
+  const { data } = useKyberAITokenOverview()
   const datafeed = useDatafeed(isBTC || false, data)
   const { SRLevels, currentPrice, resolution, setResolution, showSRLevels } = useContext(TechnicalAnalysisContext)
 
@@ -2652,6 +2658,7 @@ export const Prochart = ({
       locale: (userLocale ? userLocale.slice(0, 2) : 'en') as LanguageCode,
       auto_save_delay: 2,
       saved_data: localStorageState,
+      timezone: getTradingViewTimeZone(),
     }
     const tvWidget = new window.TradingView.widget(widgetOptions)
 

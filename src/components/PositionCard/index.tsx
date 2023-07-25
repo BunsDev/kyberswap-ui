@@ -26,9 +26,10 @@ import { useActiveWeb3React } from 'hooks'
 import useTheme from 'hooks/useTheme'
 import { TokenWrapper } from 'pages/AddLiquidity/styled'
 import { IconWrapper } from 'pages/Pools/styleds'
-import { useBlockNumber, useETHPrice, useTokensPrice } from 'state/application/hooks'
+import { useBlockNumber, useETHPrice } from 'state/application/hooks'
 import { FairLaunchVersion, Farm } from 'state/farms/classic/types'
 import { UserLiquidityPosition, useSinglePoolData } from 'state/pools/hooks'
+import { useTokenPrices } from 'state/tokenPrices/hooks'
 import { useTokenBalance } from 'state/wallet/hooks'
 import { ExternalLink, MEDIA_WIDTHS, UppercaseText } from 'theme'
 import { formattedNum, shortenAddress } from 'utils'
@@ -250,7 +251,7 @@ export function MinimalPositionCard({ pair, showUnwrapped = false }: PositionCar
   const native0 = useCurrencyConvertedToNative(currency0 || undefined)
   const native1 = useCurrencyConvertedToNative(currency1 || undefined)
 
-  const usdPrices = useTokensPrice([pair.token0, pair.token1])
+  const usdPrices = useTokenPrices([pair.token0.wrapped.address, pair.token1.wrapped.address])
 
   return (
     <>
@@ -300,7 +301,7 @@ export function MinimalPositionCard({ pair, showUnwrapped = false }: PositionCar
                       .lessThan(new Fraction(JSBI.BigInt(1), JSBI.BigInt(100)))
                   ? '<0.01'
                   : token0Deposited?.toSignificant(6)}{' '}
-                {formattedUSDPrice(token0Deposited, usdPrices[0])}
+                {formattedUSDPrice(token0Deposited, usdPrices[pair.token0.wrapped.address])}
               </Text>
             </RowFixed>
           ) : (
@@ -327,7 +328,7 @@ export function MinimalPositionCard({ pair, showUnwrapped = false }: PositionCar
                       .lessThan(new Fraction(JSBI.BigInt(1), JSBI.BigInt(100)))
                   ? '<0.01'
                   : token1Deposited?.toSignificant(6)}{' '}
-                {formattedUSDPrice(token1Deposited, usdPrices[1])}
+                {formattedUSDPrice(token1Deposited, usdPrices[pair.token1.wrapped.address])}
               </Text>
             </RowFixed>
           ) : (
@@ -720,7 +721,10 @@ export default function FullPositionCard({
                 fontSize: '14px',
               }}
               as={Link}
-              to={`/remove/${currencyId(currency0, chainId)}/${currencyId(currency1, chainId)}/${pair.address}`}
+              to={`/${networkInfo.route}${APP_PATHS.CLASSIC_REMOVE_POOL}/${currencyId(currency0, chainId)}/${currencyId(
+                currency1,
+                chainId,
+              )}/${pair.address}`}
             >
               <Text width="max-content">
                 <Trans>Remove Liquidity</Trans>
@@ -744,7 +748,10 @@ export default function FullPositionCard({
             padding="10px"
             style={{ fontSize: '14px' }}
             as={Link}
-            to={`/add/${currencyId(currency0, chainId)}/${currencyId(currency1, chainId)}/${pair.address}`}
+            to={`/${networkInfo.route}${APP_PATHS.CLASSIC_ADD_LIQ}/${currencyId(currency0, chainId)}/${currencyId(
+              currency1,
+              chainId,
+            )}/${pair.address}`}
           >
             <Text width="max-content">
               <Trans>Add Liquidity</Trans>

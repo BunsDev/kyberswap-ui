@@ -23,9 +23,10 @@ import { NETWORKS_INFO, isEVM } from 'constants/networks'
 import { TOBE_EXTENDED_FARMING_POOLS } from 'constants/v2'
 import { useActiveWeb3React } from 'hooks'
 import { useProMMFarmContract } from 'hooks/useContract'
+import { useProAmmPositions } from 'hooks/useProAmmPositions'
 import useTheme from 'hooks/useTheme'
 import { useShareFarmAddress } from 'state/farms/classic/hooks'
-import { useElasticFarms } from 'state/farms/elastic/hooks'
+import { useElasticFarms, usePositionFilter } from 'state/farms/elastic/hooks'
 import { FarmingPool, NFTPosition } from 'state/farms/elastic/types'
 import { useViewMode } from 'state/user/hooks'
 import { VIEW_MODE } from 'state/user/reducer'
@@ -65,7 +66,7 @@ const Row = ({
   onHarvest: () => void
   tokenPrices: { [key: string]: number }
 }) => {
-  const { chainId } = useActiveWeb3React()
+  const { chainId, networkInfo, account } = useActiveWeb3React()
   const theme = useTheme()
   const currentTimestamp = Math.floor(Date.now() / 1000)
   const [viewMode] = useViewMode()
@@ -74,17 +75,19 @@ const Row = ({
   const [isRevertPrice, setIsRevertPrice] = useState(false)
   const { userFarmInfo } = useElasticFarms()
   const joinedPositions = userFarmInfo?.[fairlaunchAddress]?.joinedPositions[farmingPool.pid] || []
+
   const depositedPositions =
     userFarmInfo?.[fairlaunchAddress]?.depositedPositions.filter(pos => {
       return (
+        pos.liquidity.toString() !== '0' &&
         farmingPool.poolAddress.toLowerCase() ===
-        computePoolAddress({
-          factoryAddress: NETWORKS_INFO[isEVM(chainId) ? chainId : ChainId.MAINNET].elastic.coreFactory,
-          tokenA: pos.pool.token0,
-          tokenB: pos.pool.token1,
-          fee: pos.pool.fee,
-          initCodeHashManualOverride: NETWORKS_INFO[isEVM(chainId) ? chainId : ChainId.MAINNET].elastic.initCodeHash,
-        }).toLowerCase()
+          computePoolAddress({
+            factoryAddress: NETWORKS_INFO[isEVM(chainId) ? chainId : ChainId.MAINNET].elastic.coreFactory,
+            tokenA: pos.pool.token0,
+            tokenB: pos.pool.token1,
+            fee: pos.pool.fee,
+            initCodeHashManualOverride: NETWORKS_INFO[isEVM(chainId) ? chainId : ChainId.MAINNET].elastic.initCodeHash,
+          }).toLowerCase()
       )
     }) || []
 
@@ -142,15 +145,17 @@ const Row = ({
     getFeeTargetInfo()
   }, [contract, farmingPool.feeTarget, fairlaunchAddress, farmingPool.pid, userFarmInfo])
 
-  const canStake =
-    farmingPool.endTime > currentTimestamp &&
-    depositedPositions.some(pos => {
-      const stakedPos = joinedPositions.find(j => j.nftId.toString() === pos.nftId.toString())
-      return !stakedPos
-        ? true
-        : BigNumber.from(pos.liquidity.toString()).gt(BigNumber.from(stakedPos.liquidity.toString()))
-    })
+  const { positions } = useProAmmPositions(account)
 
+  const { eligiblePositions } = usePositionFilter(positions || [], [farmingPool.poolAddress.toLowerCase()])
+
+  const canUpdateLiquidity = depositedPositions.some(pos => {
+    const stakedPos = joinedPositions.find(j => j.nftId.toString() === pos.nftId.toString())
+    return !stakedPos
+      ? true
+      : BigNumber.from(pos.liquidity.toString()).gt(BigNumber.from(stakedPos.liquidity.toString()))
+  })
+  const canStake = farmingPool.endTime > currentTimestamp && (eligiblePositions.length > 0 || canUpdateLiquidity)
   const canHarvest = rewardPendings.some(amount => amount.greaterThan(0))
 
   const canUnstake = !!joinedPositions.length
@@ -305,27 +310,38 @@ const Row = ({
     </Flex>
   )
 
+  const symbol0 = getTokenSymbolWithHardcode(chainId, farmingPool.token0.wrapped.address, farmingPool.token0.symbol)
+  const symbol1 = getTokenSymbolWithHardcode(chainId, farmingPool.token1.wrapped.address, farmingPool.token1.symbol)
+
   return (
     <RowWrapper isOpen={rowOpen && !!depositedPositions.length} data-testid={farmingPool.id}>
       <ProMMFarmTableRow isOpen={rowOpen && !!depositedPositions.length}>
         <div>
           <Flex alignItems="center">
             <DoubleCurrencyLogo currency0={farmingPool.token0} currency1={farmingPool.token1} />
-            <Link
-              to={`${APP_PATHS.ELASTIC_CREATE_POOL}/${
-                farmingPool.token0.isNative ? farmingPool.token0.symbol : farmingPool.token0.address
-              }/${farmingPool.token1.isNative ? farmingPool.token1.symbol : farmingPool.token1.address}/${
-                farmingPool.pool.fee
-              }`}
-              style={{
-                textDecoration: 'none',
-              }}
-            >
-              <Text fontSize={14} fontWeight={500}>
-                {getTokenSymbolWithHardcode(chainId, farmingPool.token0.wrapped.address, farmingPool.token0.symbol)} -{' '}
-                {getTokenSymbolWithHardcode(chainId, farmingPool.token1.wrapped.address, farmingPool.token1.symbol)}
-              </Text>
-            </Link>
+            <Text fontSize={14} fontWeight={500} flex={1} maxWidth="fit-content">
+              <Link
+                to={`/${networkInfo.route}${APP_PATHS.ELASTIC_CREATE_POOL}/${
+                  farmingPool.token0.isNative ? farmingPool.token0.symbol : farmingPool.token0.address
+                }/${farmingPool.token1.isNative ? farmingPool.token1.symbol : farmingPool.token1.address}/${
+                  farmingPool.pool.fee
+                }`}
+                style={{
+                  textDecoration: 'none',
+                }}
+              >
+                <MouseoverTooltip
+                  text={`${symbol0} - ${symbol1}`}
+                  width="fit-content"
+                  containerStyle={{ maxWidth: '100%' }}
+                  placement="top"
+                >
+                  <Text sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {symbol0} - {symbol1}
+                  </Text>
+                </MouseoverTooltip>
+              </Link>
+            </Text>
 
             <FeeTag>FEE {(farmingPool.pool.fee * 100) / ELASTIC_BASE_FEE_UNIT}%</FeeTag>
           </Flex>

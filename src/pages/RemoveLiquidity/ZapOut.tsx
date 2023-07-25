@@ -35,7 +35,7 @@ import TransactionConfirmationModal, {
 } from 'components/TransactionConfirmationModal'
 import ZapError from 'components/ZapError'
 import FormattedPriceImpact from 'components/swapv2/FormattedPriceImpact'
-import { EIP712Domain } from 'constants/index'
+import { APP_PATHS, EIP712Domain } from 'constants/index'
 import { EVMNetworkInfo } from 'constants/networks/type'
 import { NativeCurrencies } from 'constants/tokens'
 import { useActiveWeb3React, useWeb3React } from 'hooks'
@@ -46,9 +46,10 @@ import useIsArgentWallet from 'hooks/useIsArgentWallet'
 import useTheme from 'hooks/useTheme'
 import useTransactionDeadline from 'hooks/useTransactionDeadline'
 import { Wrapper } from 'pages/Pool/styleds'
-import { useTokensPrice, useWalletModalToggle } from 'state/application/hooks'
+import { useWalletModalToggle } from 'state/application/hooks'
 import { Field } from 'state/burn/actions'
 import { useBurnState, useDerivedZapOutInfo, useZapOutActionHandlers } from 'state/burn/hooks'
+import { useTokenPrices } from 'state/tokenPrices/hooks'
 import { useTransactionAdder } from 'state/transactions/hooks'
 import { TRANSACTION_TYPE } from 'state/transactions/type'
 import { useDegenModeManager, useUserSlippageTolerance } from 'state/user/hooks'
@@ -410,7 +411,8 @@ export default function ZapOut({
         .then((response: TransactionResponse) => {
           if (currencyA && currencyB) {
             setAttemptingTxn(false)
-            const tokenAmount = parsedAmounts[independentTokenField]?.toSignificant(6)
+            const tokenAmount = parsedAmounts[independentTokenField]
+            const tokenAmountStr = tokenAmount?.toSignificant(6)
             addTransactionWithType({
               hash: response.hash,
               type: TRANSACTION_TYPE.CLASSIC_REMOVE_LIQUIDITY,
@@ -419,7 +421,9 @@ export default function ZapOut({
                 tokenAddressOut: currencyB.wrapped.address,
                 tokenSymbolIn: currencyA.symbol,
                 tokenSymbolOut: currencyB.symbol,
-                tokenAmountIn: tokenAmount,
+                [(tokenAmount as TokenAmount)?.currency?.address === currencyA?.wrapped.address
+                  ? 'tokenAmountIn'
+                  : 'tokenAmountOut']: tokenAmountStr,
                 contract: pairAddress,
                 arbitrary: {
                   poolAddress: pairAddress,
@@ -492,7 +496,12 @@ export default function ZapOut({
         )
       : undefined
 
-  const usdPrices = useTokensPrice([tokenA, tokenB])
+  const tokenAddresses: string[] = useMemo(
+    () => [tokenA, tokenB].map(token => token?.address as string).filter(item => !!item),
+    [tokenA, tokenB],
+  )
+  const marketPriceMap = useTokenPrices(tokenAddresses)
+  const usdPrices = [tokenA, tokenB].map(item => marketPriceMap[item?.address || ''] || 0)
 
   const independentTokenPrice = independentTokenField === Field.CURRENCY_A ? usdPrices[0] : usdPrices[1]
 
@@ -615,6 +624,12 @@ export default function ZapOut({
     )
   }
 
+  const lpToken = useMemo(() => {
+    return (
+      pair && new Token(chainId, pair.liquidityToken?.address, pair.liquidityToken?.decimals, `LP Tokens`, `LP Tokens`)
+    )
+  }, [chainId, pair])
+
   return (
     <>
       <Wrapper>
@@ -680,15 +695,7 @@ export default function ZapOut({
                   onMax={null}
                   onHalf={null}
                   disableCurrencySelect
-                  currency={
-                    new Token(
-                      chainId,
-                      pair.liquidityToken?.address,
-                      pair.liquidityToken?.decimals,
-                      `LP Tokens`,
-                      `LP Tokens`,
-                    )
-                  }
+                  currency={lpToken}
                   id="liquidity-amount"
                 />
               )}
@@ -721,12 +728,15 @@ export default function ZapOut({
                         replace
                         to={
                           independentTokenField === Field.CURRENCY_A
-                            ? `/remove/${
+                            ? `/${networkInfo.route}${APP_PATHS.CLASSIC_REMOVE_POOL}/${
                                 selectedCurrencyIsETHER
                                   ? currencyId(WETH[chainId], chainId)
                                   : currencyId(NativeCurrencies[chainId], chainId)
                               }/${currencyId(currencies[dependentTokenField] as Currency, chainId)}/${pairAddress}`
-                            : `/remove/${currencyId(currencies[dependentTokenField] as Currency, chainId)}/${
+                            : `/${networkInfo.route}${APP_PATHS.CLASSIC_REMOVE_POOL}/${currencyId(
+                                currencies[dependentTokenField] as Currency,
+                                chainId,
+                              )}/${
                                 selectedCurrencyIsETHER
                                   ? currencyId(WETH[chainId], chainId)
                                   : currencyId(NativeCurrencies[chainId], chainId)

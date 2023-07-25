@@ -24,7 +24,6 @@ export enum ApplicationModal {
 
   SHARE,
   TRENDING_SOON_SORTING,
-  TRUESIGHT_NETWORK,
   TRENDING_SOON_TOKEN_DETAIL,
   COMMUNITY,
   CONTRACT_ADDRESS,
@@ -32,8 +31,9 @@ export enum ApplicationModal {
   SELECT_CAMPAIGN,
   REGISTER_CAMPAIGN_CAPTCHA,
   REGISTER_CAMPAIGN_SUCCESS,
-  NOTIFICATION_SUBSCRIPTION,
   NOTIFICATION_CENTER,
+  SWITCH_PROFILE_POPUP,
+  MENU_NOTI_CENTER,
   YOUR_CAMPAIGN_TRANSACTIONS,
 
   // KyberDAO
@@ -75,13 +75,10 @@ export const updateETHPrice = createAction<{
   pricePercentChange: number
 }>('application/updateETHPrice')
 
-export const updateKNCPrice = createAction<string | undefined>('application/updateKNCPrice')
-
 export const updateServiceWorker = createAction<ServiceWorkerRegistration>('application/updateServiceWorker')
 
 export const setSubscribedNotificationTopic = createAction<{
   topicGroups: Topic[]
-  userInfo: { email: string; telegram: string }
 }>('application/setSubscribedNotificationTopic')
 
 export const setLoadingNotification = createAction<boolean>('application/setLoadingNotification')

@@ -5,7 +5,7 @@ import AnnouncementApi from 'services/announcement'
 
 import { AnnouncementTemplatePopup, PopupContentAnnouncement, PopupItemType } from 'components/Announcement/type'
 import { useActiveWeb3React } from 'hooks'
-import { useChangeNetwork } from 'hooks/useChangeNetwork'
+import { useChangeNetwork } from 'hooks/web3/useChangeNetwork'
 import { useAppDispatch } from 'state/hooks'
 
 const LsKey = 'ack-announcements'
@@ -49,7 +49,7 @@ export const isPopupCanShow = (
 export const useNavigateToUrl = () => {
   const navigate = useNavigate()
   const { chainId: currentChain } = useActiveWeb3React()
-  const changeNetwork = useChangeNetwork()
+  const { changeNetwork } = useChangeNetwork()
 
   const redirect = useCallback(
     (actionURL: string) => {
@@ -85,10 +85,10 @@ export const useNavigateToUrl = () => {
 export const useInvalidateTags = (reducerPath: string) => {
   const dispatch = useAppDispatch()
   return useCallback(
-    (tag: string) => {
+    (tag: string | string[]) => {
       dispatch({
         type: `${reducerPath}/invalidateTags`,
-        payload: [tag],
+        payload: Array.isArray(tag) ? tag : [tag],
       })
     },
     [dispatch, reducerPath],

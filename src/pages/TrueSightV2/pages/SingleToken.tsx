@@ -16,10 +16,11 @@ import { APP_PATHS } from 'constants/index'
 import { useActiveWeb3React } from 'hooks'
 import useMixpanel, { MIXPANEL_TYPE } from 'hooks/useMixpanel'
 import useTheme from 'hooks/useTheme'
-import { NOTIFICATION_ROUTES } from 'pages/NotificationCenter/const'
+import { PROFILE_MANAGE_ROUTES } from 'pages/NotificationCenter/const'
 import { MEDIA_WIDTHS } from 'theme'
 
 import DisplaySettings from '../components/DisplaySettings'
+import FeedbackSurvey from '../components/FeedbackSurvey'
 import KyberAIShareModal from '../components/KyberAIShareModal'
 import SimpleTooltip from '../components/SimpleTooltip'
 import { TokenOverview } from '../components/TokenOverview'
@@ -292,20 +293,20 @@ const TokenNameGroup = ({ token, isLoading }: { token?: ITokenOverview; isLoadin
         text={isWatched ? t`Remove from watchlist` : reachedMaxLimit ? t`Reached 30 tokens limit` : t`Add to watchlist`}
         hideOnMobile
       >
-        <HeaderButton
-          style={{
+        <StarWithAnimation
+          watched={isWatched}
+          loading={loadingAddtoWatchlist || loadingRemovefromWatchlist}
+          size={16}
+          disabled={!isWatched && reachedMaxLimit}
+          onClick={handleStarClick}
+          wrapperStyle={{
             color: isWatched ? theme.primary : theme.subText,
-            backgroundColor: isWatched ? theme.primary + '33' : undefined,
+            backgroundColor: isWatched ? theme.primary + '33' : theme.darkMode ? theme.buttonGray : theme.background,
+            height: above768 ? '36px' : '32px',
+            width: above768 ? '36px' : '32px',
+            borderRadius: '100%',
           }}
-        >
-          <StarWithAnimation
-            watched={isWatched}
-            loading={loadingAddtoWatchlist || loadingRemovefromWatchlist}
-            size={16}
-            disabled={!isWatched && reachedMaxLimit}
-            onClick={handleStarClick}
-          />
-        </HeaderButton>
+        />
       </SimpleTooltip>
       <div style={{ position: 'relative' }}>
         <div style={{ borderRadius: '50%', overflow: 'hidden' }}>
@@ -360,7 +361,7 @@ const SettingButtons = ({ token, onShareClick }: { token?: ITokenOverview; onSha
         <HeaderButton
           onClick={() =>
             navigate(
-              `${APP_PATHS.NOTIFICATION_CENTER}${NOTIFICATION_ROUTES.CREATE_ALERT}?${stringify({
+              `${APP_PATHS.PROFILE_MANAGE}${PROFILE_MANAGE_ROUTES.CREATE_ALERT}?${stringify({
                 inputCurrency: token?.address ?? '',
                 chainId: chain ? NETWORK_TO_CHAINID[chain] : '',
               })}`,
@@ -612,6 +613,7 @@ export default function SingleToken() {
           })
         }
       />
+      <FeedbackSurvey />
     </Wrapper>
   )
 }

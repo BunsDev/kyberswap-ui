@@ -5,7 +5,7 @@ import { rgba } from 'polished'
 import React from 'react'
 import { AlertTriangle, Info, Minus, Plus, Share2 } from 'react-feather'
 import { useDispatch } from 'react-redux'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Flex, Text } from 'rebass'
 
 import { ButtonEmpty } from 'components/Button'
@@ -28,6 +28,7 @@ import { SubgraphPoolData, UserLiquidityPosition, useSharedPoolIdManager } from 
 import { formattedNum, shortenAddress } from 'utils'
 import { currencyId } from 'utils/currencyId'
 import { getMyLiquidity, getTradingFeeAPR, parseSubgraphPoolData } from 'utils/dmm'
+import { getTokenSymbolWithHardcode } from 'utils/tokenInfo'
 
 interface ListItemGroupProps {
   poolData: SubgraphPoolData
@@ -43,8 +44,6 @@ const ListItem = ({ poolData, userLiquidityPositions }: ListItemGroupProps) => {
 
   const amp = new Fraction(poolData.amp).divide(JSBI.BigInt(10000))
 
-  const navigate = useNavigate()
-
   const { data: uniqueAndActiveFarms } = useActiveAndUniqueFarmsData()
   const farm = uniqueAndActiveFarms.find(f => f.id.toLowerCase() === poolData.id.toLowerCase())
 
@@ -56,6 +55,9 @@ const ListItem = ({ poolData, userLiquidityPositions }: ListItemGroupProps) => {
     poolData,
     chainId,
   )
+  const currency0Symbol = getTokenSymbolWithHardcode(chainId, currency0.wrapped.address, currency0.symbol)
+  const currency1Symbol = getTokenSymbolWithHardcode(chainId, currency1.wrapped.address, currency1.symbol)
+
   const realPercentToken0 =
     reserve0 && virtualReserve0 && reserve1 && virtualReserve1
       ? reserve0.asFraction
@@ -120,7 +122,7 @@ const ListItem = ({ poolData, userLiquidityPositions }: ListItemGroupProps) => {
         <Flex alignItems="center">
           <DoubleCurrencyLogo currency0={currency0} currency1={currency1} size={20} />
           <Text fontSize="14px" fontWeight="500">
-            {poolData.token0.symbol} - {poolData.token1.symbol}
+            {currency0Symbol} - {currency1Symbol}
           </Text>
           <FeeTag style={{ padding: '4px 6px' }}>AMP {formattedNum(amp.toSignificant(5))}</FeeTag>
           {isFarmingPool && (
@@ -196,10 +198,13 @@ const ListItem = ({ poolData, userLiquidityPositions }: ListItemGroupProps) => {
             width: '28px',
             height: '28px',
           }}
+          as={Link}
+          to={`/${networkInfo.route}${APP_PATHS.CLASSIC_ADD_LIQ}/${currencyId(currency0, chainId)}/${currencyId(
+            currency1,
+            chainId,
+          )}/${poolData.id}`}
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation()
-            const url = `/add/${currencyId(currency0, chainId)}/${currencyId(currency1, chainId)}/${poolData.id}`
-            navigate(url)
           }}
         >
           <Plus size={16} color={theme.primary} />
@@ -208,7 +213,10 @@ const ListItem = ({ poolData, userLiquidityPositions }: ListItemGroupProps) => {
           <ButtonEmpty
             padding="0"
             as={Link}
-            to={`/remove/${currencyId(currency0, chainId)}/${currencyId(currency1, chainId)}/${poolData.id}`}
+            to={`/${networkInfo.route}${APP_PATHS.CLASSIC_REMOVE_POOL}/${currencyId(currency0, chainId)}/${currencyId(
+              currency1,
+              chainId,
+            )}/${poolData.id}`}
             style={{
               background: rgba(theme.red, 0.2),
               minWidth: '28px',

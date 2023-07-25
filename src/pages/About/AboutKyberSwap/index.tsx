@@ -47,6 +47,7 @@ import {
   Fantom,
   FantomLogoFull,
   FarmIcon,
+  LineaFull,
   LowestSlippage,
   MoneyBagOutline,
   Oasis,
@@ -61,6 +62,8 @@ import {
   VelasLogoFull,
 } from 'components/Icons'
 import AntiSnippingAttack from 'components/Icons/AntiSnippingAttack'
+import ZkSync from 'components/Icons/ZkSync'
+import ZkSyncFull from 'components/Icons/ZkSyncFull'
 import Loader from 'components/Loader'
 import { APP_PATHS } from 'constants/index'
 import { MAINNET_NETWORKS, NETWORKS_INFO } from 'constants/networks'
@@ -100,7 +103,8 @@ import {
   VerticalDivider,
   Wrapper,
 } from '../styleds'
-import MeetTheTeam from './MeetTheTeam'
+
+// import MeetTheTeam from './MeetTheTeam'
 
 const KNCBlack = styled(KNCSVG)`
   path {
@@ -166,7 +170,7 @@ export const KSStatistic = () => {
         <ForTraderInfoRow>
           <ForTraderInfoCell>
             <Text fontWeight="600" fontSize="24px">
-              {MAINNET_NETWORKS.length - 1}+
+              {MAINNET_NETWORKS.length}+
             </Text>
             <Text color={theme.subText} marginTop="4px" fontSize="14px">
               <Trans>Chains</Trans>
@@ -503,7 +507,7 @@ function AboutKyberSwap() {
               <Text fontWeight="500" color={theme.primary} as="span">
                 Earn
               </Text>{' '}
-              Tokens at the Best Rates
+              Tokens at Superior Rates
             </Trans>
           </Text>
 
@@ -521,6 +525,8 @@ function AboutKyberSwap() {
             <Bttc />
             <OptimismLogo />
             <Solana />
+            <ZkSync />
+            <img src="https://linea.build/apple-touch-icon.png" width="36px" height="36px" alt="Linea" />
           </SupportedChain>
 
           <KyberSwapGeneralIntro />
@@ -633,7 +639,7 @@ function AboutKyberSwap() {
                 <Trans>FOR TRADERS</Trans>
               </Text>
               <Text as="h2" marginTop="12px" fontSize={['28px', '36px']} fontWeight="500">
-                <Trans>Swap your tokens at the best rates. No limits</Trans>
+                <Trans>Swap your tokens at superior rates. No limits</Trans>
               </Text>
               <Text
                 fontSize="16px"
@@ -644,14 +650,14 @@ function AboutKyberSwap() {
               >
                 <Trans>
                   With our Dynamic Trade Routing technology, we aggregate liquidity from multiple DEXs (including
-                  KyberSwap) and identify the best trade route for you.
+                  KyberSwap) and identify superior trade routes for you.
                 </Trans>
               </Text>
 
               <Flex marginTop="20px" alignItems="center">
                 <BestPrice />
                 <Text marginLeft="12px">
-                  <Trans>Best price guaranteed</Trans>
+                  <Trans>Superior price guaranteed</Trans>
                 </Text>
               </Flex>
               <Flex marginTop="20px" alignItems="center">
@@ -1020,7 +1026,7 @@ function AboutKyberSwap() {
             </Flex>
           </AboutKNC>
 
-          <MeetTheTeam />
+          {/* <MeetTheTeam /> */}
 
           <Text as="h2" marginTop={['100px', '160px']} fontSize={['28px', '36px']} fontWeight="500" textAlign="center">
             <Trans>Powered by</Trans>
@@ -1040,6 +1046,8 @@ function AboutKyberSwap() {
               <img src={isDarkMode ? BTTCDark : BTTCLight} alt="btt" width="100%" />
               <OptimismLogoFull />
               <SolanaLogoFull />
+              <ZkSyncFull />
+              <LineaFull />
             </Powered>
           </Text>
         </Wrapper>

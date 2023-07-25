@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useGetParticipantInfoQuery } from 'services/kyberAISubscription'
 
-import { TERM_FILES_PATH } from 'constants/index'
+import { DEFAULT_SLIPPAGE_TESTNET, TERM_FILES_PATH } from 'constants/index'
 import { SupportedLocale } from 'constants/locales'
 import { PINNED_PAIRS } from 'constants/tokens'
 import { useActiveWeb3React } from 'hooks'
@@ -13,9 +13,10 @@ import {
   useOldStaticFeeFactoryContract,
   useStaticFeeFactoryContract,
 } from 'hooks/useContract'
+import useDebounce from 'hooks/useDebounce'
 import { ParticipantInfo, ParticipantStatus } from 'pages/TrueSightV2/types'
 import { AppDispatch, AppState } from 'state'
-import { useSessionInfo } from 'state/authen/hooks'
+import { useIsConnectingWallet, useSessionInfo } from 'state/authen/hooks'
 import { useAppDispatch, useAppSelector } from 'state/hooks'
 import { WrappedTokenInfo } from 'state/lists/wrappedTokenInfo'
 import { useSingleContractMultipleData } from 'state/multicall/hooks'
@@ -27,7 +28,9 @@ import {
   addSerializedPair,
   addSerializedToken,
   changeViewMode,
+  pinSlippageControl,
   removeSerializedToken,
+  setCrossChainSetting,
   toggleFavoriteToken as toggleFavoriteTokenAction,
   toggleHolidayMode,
   toggleKyberAIBanner,
@@ -37,15 +40,15 @@ import {
   toggleTopTrendingTokens,
   toggleTradeRoutes,
   updateAcceptedTermVersion,
-  updateIsUserManuallyDisconnect,
   updateTokenAnalysisSettings,
   updateUserDarkMode,
   updateUserDeadline,
   updateUserDegenMode,
   updateUserLocale,
   updateUserSlippageTolerance,
+  updateUserSlippageToleranceForLineaTestnet,
 } from 'state/user/actions'
-import { VIEW_MODE, defaultShowLiveCharts, getFavoriteTokenDefault } from 'state/user/reducer'
+import { CROSS_CHAIN_SETTING_DEFAULT, CrossChainSetting, VIEW_MODE, getFavoriteTokenDefault } from 'state/user/reducer'
 import { isAddress, isChristmasTime } from 'utils'
 
 function serializeToken(token: Token | WrappedTokenInfo): SerializedToken {
@@ -114,22 +117,6 @@ export function useUserLocaleManager(): [SupportedLocale | null, (newLocale: Sup
   return [locale, setLocale]
 }
 
-export function useIsUserManuallyDisconnect(): [boolean, (isUserManuallyDisconnect: boolean) => void] {
-  const dispatch = useAppDispatch()
-  const isUserManuallyDisconnect = useSelector<AppState, AppState['user']['isUserManuallyDisconnect']>(
-    state => state.user.isUserManuallyDisconnect,
-  )
-
-  const setIsUserManuallyDisconnect = useCallback(
-    (isUserManuallyDisconnect: boolean) => {
-      dispatch(updateIsUserManuallyDisconnect(isUserManuallyDisconnect))
-    },
-    [dispatch],
-  )
-
-  return [isUserManuallyDisconnect, setIsUserManuallyDisconnect]
-}
-
 export function useIsAcceptedTerm(): [boolean, (isAcceptedTerm: boolean) => void] {
   const dispatch = useAppDispatch()
   const acceptedTermVersion = useSelector<AppState, AppState['user']['acceptedTermVersion']>(
@@ -162,15 +149,23 @@ export function useDegenModeManager(): [boolean, () => void] {
 
 export function useUserSlippageTolerance(): [number, (slippage: number) => void] {
   const dispatch = useDispatch<AppDispatch>()
+  const { chainId } = useActiveWeb3React()
+  const isLineaTestnet = chainId === ChainId.LINEA_TESTNET
   const userSlippageTolerance = useSelector<AppState, AppState['user']['userSlippageTolerance']>(state => {
-    return state.user.userSlippageTolerance
+    return isLineaTestnet
+      ? state.user.userSlippageToleranceForLineaTestnet || DEFAULT_SLIPPAGE_TESTNET
+      : state.user.userSlippageTolerance
   })
 
   const setUserSlippageTolerance = useCallback(
     (userSlippageTolerance: number) => {
-      dispatch(updateUserSlippageTolerance({ userSlippageTolerance }))
+      if (isLineaTestnet) {
+        dispatch(updateUserSlippageToleranceForLineaTestnet({ userSlippageTolerance }))
+      } else {
+        dispatch(updateUserSlippageTolerance({ userSlippageTolerance }))
+      }
     },
-    [dispatch],
+    [dispatch, isLineaTestnet],
   )
 
   return [userSlippageTolerance, setUserSlippageTolerance]
@@ -347,15 +342,8 @@ export function useLiquidityPositionTokenPairs(): [Token, Token][] {
 }
 
 export function useShowLiveChart(): boolean {
-  const { chainId } = useActiveWeb3React()
-  let showLiveChart = useSelector((state: AppState) => state.user.showLiveCharts)
-  if (typeof showLiveChart?.[chainId] !== 'boolean') {
-    showLiveChart = defaultShowLiveCharts
-  }
-
-  const show = showLiveChart[chainId]
-
-  return !!show
+  const showLiveChart = useSelector((state: AppState) => state.user.showLiveChart)
+  return typeof showLiveChart !== 'boolean' || showLiveChart
 }
 
 export function useShowTradeRoutes(): boolean {
@@ -382,8 +370,7 @@ export function useUpdateTokenAnalysisSettings(): (payload: string) => void {
 
 export function useToggleLiveChart(): () => void {
   const dispatch = useDispatch<AppDispatch>()
-  const { chainId } = useActiveWeb3React()
-  return useCallback(() => dispatch(toggleLiveChart({ chainId: chainId })), [dispatch, chainId])
+  return useCallback(() => dispatch(toggleLiveChart()), [dispatch])
 }
 
 export function useToggleTradeRoutes(): () => void {
@@ -444,7 +431,66 @@ export const useHolidayMode: () => [boolean, () => void] = () => {
   return [isChristmasTime() ? holidayMode : false, toggle]
 }
 
-const participantDefault = { rankNo: 0, status: ParticipantStatus.UNKNOWN, referralCode: '', id: 0 }
+export const useCrossChainSetting = () => {
+  const dispatch = useAppDispatch()
+  const setting = useAppSelector(state => state.user.crossChain) || CROSS_CHAIN_SETTING_DEFAULT
+  const setSetting = useCallback(
+    (data: CrossChainSetting) => {
+      dispatch(setCrossChainSetting(data))
+    },
+    [dispatch],
+  )
+  const setExpressExecutionMode = useCallback(
+    (enableExpressExecution: boolean) => {
+      setSetting({ ...setting, enableExpressExecution })
+    },
+    [setSetting, setting],
+  )
+
+  const setRawSlippage = useCallback(
+    (slippageTolerance: number) => {
+      setSetting({ ...setting, slippageTolerance })
+    },
+    [setSetting, setting],
+  )
+
+  const toggleSlippageControlPinned = useCallback(() => {
+    setSetting({ ...setting, isSlippageControlPinned: !setting.isSlippageControlPinned })
+  }, [setSetting, setting])
+
+  return { setting, setExpressExecutionMode, setRawSlippage, toggleSlippageControlPinned }
+}
+
+export const useSlippageSettingByPage = (isCrossChain = false) => {
+  const dispatch = useDispatch()
+  const isPinSlippageSwap = useAppSelector(state => state.user.isSlippageControlPinned)
+  const [rawSlippageSwap, setRawSlippageSwap] = useUserSlippageTolerance()
+  const togglePinSlippageSwap = () => {
+    dispatch(pinSlippageControl(!isSlippageControlPinned))
+  }
+
+  const {
+    setting: { slippageTolerance: rawSlippageSwapCrossChain, isSlippageControlPinned: isPinSlippageCrossChain },
+    setRawSlippage: setRawSlippageCrossChain,
+    toggleSlippageControlPinned: togglePinnedSlippageCrossChain,
+  } = useCrossChainSetting()
+
+  const isSlippageControlPinned = isCrossChain ? isPinSlippageCrossChain : isPinSlippageSwap
+  const rawSlippage = isCrossChain ? rawSlippageSwapCrossChain : rawSlippageSwap
+  const setRawSlippage = isCrossChain ? setRawSlippageCrossChain : setRawSlippageSwap
+  const togglePinSlippage = isCrossChain ? togglePinnedSlippageCrossChain : togglePinSlippageSwap
+
+  return { setRawSlippage, rawSlippage, isSlippageControlPinned, togglePinSlippage }
+}
+
+const participantDefault = {
+  rankNo: 0,
+  status: ParticipantStatus.UNKNOWN,
+  referralCode: '',
+  id: 0,
+  updatedAt: 0,
+  createdAt: 0,
+}
 export const useGetParticipantKyberAIInfo = (): ParticipantInfo => {
   const { userInfo } = useSessionInfo()
   const { data: data = participantDefault, isError } = useGetParticipantInfoQuery(undefined, {
@@ -454,22 +500,32 @@ export const useGetParticipantKyberAIInfo = (): ParticipantInfo => {
 }
 
 export const useIsWhiteListKyberAI = () => {
-  const { userInfo } = useSessionInfo()
-  const { isLogin, pendingAuthentication } = useSessionInfo()
+  const { isLogin, pendingAuthentication, userInfo } = useSessionInfo()
   const {
     data: rawData,
     isFetching,
     isError,
+    refetch,
   } = useGetParticipantInfoQuery(undefined, {
     skip: !userInfo,
   })
-  const participantInfo = isError ? participantDefault : rawData
 
+  const { account } = useActiveWeb3React()
+  const [connectingWallet] = useIsConnectingWallet()
+
+  const isLoading = isFetching || pendingAuthentication
+  const loadingDebounced = useDebounce(isLoading, 500) || connectingWallet
+
+  const participantInfo = isError || loadingDebounced || !account ? participantDefault : rawData
+  // isWhitelist, isWaitList check account is hotfix for now, will remove utils backend fixed bug
   return {
-    loading: isFetching || pendingAuthentication,
+    loading: loadingDebounced,
     isWhiteList:
-      isLogin && (participantInfo?.status === ParticipantStatus.WHITELISTED || userInfo?.data?.hasAccessToKyberAI),
-    isWaitList: isLogin && participantInfo?.status === ParticipantStatus.WAITLISTED,
+      !!account &&
+      isLogin &&
+      (participantInfo?.status === ParticipantStatus.WHITELISTED || userInfo?.data?.hasAccessToKyberAI),
+    isWaitList: !!account && isLogin && participantInfo?.status === ParticipantStatus.WAITLISTED,
+    refetch,
   }
 }
 

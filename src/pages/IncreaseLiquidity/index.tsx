@@ -19,7 +19,6 @@ import CurrencyInputPanel from 'components/CurrencyInputPanel'
 import CurrencyLogo from 'components/CurrencyLogo'
 import Divider from 'components/Divider'
 import Dots from 'components/Dots'
-import ElasticDisclaimerModal from 'components/ElasticDisclaimerModal'
 import FormattedCurrencyAmount from 'components/FormattedCurrencyAmount'
 import Loader from 'components/Loader'
 import { AddRemoveTabs, LiquidityAction } from 'components/NavigationTabs'
@@ -61,8 +60,9 @@ import { useTransactionAdder } from 'state/transactions/hooks'
 import { TRANSACTION_TYPE } from 'state/transactions/type'
 import { useDegenModeManager, useUserSlippageTolerance } from 'state/user/hooks'
 import { MEDIA_WIDTHS, TYPE } from 'theme'
-import { calculateGasMargin, formattedNum, formattedNumLong, isAddressString } from 'utils'
+import { calculateGasMargin, formattedNum, isAddressString } from 'utils'
 import { maxAmountSpend } from 'utils/maxAmountSpend'
+import { formatDollarAmount } from 'utils/numbers'
 import { SLIPPAGE_STATUS, checkRangeSlippage } from 'utils/slippage'
 import { unwrappedToken } from 'utils/wrappedCurrency'
 
@@ -108,11 +108,14 @@ export default function IncreaseLiquidity() {
     tokenId ? BigNumber.from(tokenId) : undefined,
   )
 
+  const removed = existingPositionDetails?.liquidity?.eq(0)
+
   const owner = useSingleCallResult(!!tokenId ? positionManager : null, 'ownerOf', [tokenId]).result?.[0]
 
   const ownsNFT = owner === account || existingPositionDetails?.operator === account
   const ownByFarm = isEVM
-    ? (networkInfo as EVMNetworkInfo).elastic.farms.flat().includes(isAddressString(chainId, owner))
+    ? (networkInfo as EVMNetworkInfo).elastic.farms.flat().includes(isAddressString(chainId, owner)) ||
+      (networkInfo as EVMNetworkInfo).elastic.farmV2S?.map(item => item.toLowerCase()).includes(owner?.toLowerCase())
     : false
 
   const { position: existingPosition } = useProAmmDerivedPositionInfo(existingPositionDetails)
@@ -498,9 +501,11 @@ export default function IncreaseLiquidity() {
 
                   <BlackCard style={{ borderRadius: '1rem', padding: '1rem' }}>
                     <Flex alignItems="center" sx={{ gap: '4px' }}>
-                      <TokenId color={outOfRange ? theme.warning : theme.primary}>#{tokenId?.toString()}</TokenId>
+                      <TokenId color={removed ? theme.red : outOfRange ? theme.warning : theme.primary}>
+                        #{tokenId?.toString()}
+                      </TokenId>
                       {/* dont show removed when increasing liquidity*/}
-                      <RangeBadge removed={false} inRange={!outOfRange} hideText size={14} />
+                      <RangeBadge removed={removed} inRange={!outOfRange} hideText size={14} />
                     </Flex>
 
                     <Flex
@@ -513,7 +518,7 @@ export default function IncreaseLiquidity() {
                       <Text>
                         <Trans>My Liquidity</Trans>
                       </Text>
-                      <Text>{formattedNumLong(totalPooledUSD, true)}</Text>
+                      <Text>{formatDollarAmount(totalPooledUSD)}</Text>
                     </Flex>
 
                     <Divider />
@@ -601,7 +606,7 @@ export default function IncreaseLiquidity() {
                           onSwitchCurrency={() => {
                             chainId &&
                               navigate(
-                                `/elastic/increase/${
+                                `/${networkInfo.route}${APP_PATHS.ELASTIC_INCREASE_LIQ}/${
                                   baseCurrencyIsETHER ? WETH[chainId].address : NativeCurrencies[chainId].symbol
                                 }/${currencyIdB}/${feeAmount}/${tokenId}`,
                                 {
@@ -640,7 +645,7 @@ export default function IncreaseLiquidity() {
                           onSwitchCurrency={() => {
                             chainId &&
                               navigate(
-                                `/elastic/increase/${currencyIdA}/${
+                                `/${networkInfo.route}${APP_PATHS.ELASTIC_INCREASE_LIQ}/${currencyIdA}/${
                                   quoteCurrencyIsETHER ? WETH[chainId].address : NativeCurrencies[chainId].symbol
                                 }/${feeAmount}/${tokenId}`,
                                 { replace: true },
@@ -686,8 +691,6 @@ export default function IncreaseLiquidity() {
           )}
         </Content>
       </Container>
-
-      <ElasticDisclaimerModal isOpen={false} />
     </>
   )
 }

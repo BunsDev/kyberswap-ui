@@ -1,4 +1,3 @@
-import KyberOauth2 from '@kybernetwork/oauth2'
 import { Trans, t } from '@lingui/macro'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -9,6 +8,7 @@ import styled from 'styled-components'
 import { ButtonPrimary } from 'components/Button'
 import { APP_PATHS } from 'constants/index'
 import { useActiveWeb3React } from 'hooks'
+import useLogin from 'hooks/useLogin'
 import useMixpanel, { MIXPANEL_TYPE } from 'hooks/useMixpanel'
 import useTheme from 'hooks/useTheme'
 import SubscribeForm from 'pages/TrueSightV2/pages/RegisterWhitelist/SubscribeForm'
@@ -30,8 +30,9 @@ export default function RegisterWhitelist({ showForm = true }: { showForm?: bool
   const { account } = useActiveWeb3React()
   const toggleWalletModal = useWalletModalToggle()
   const { isLogin } = useSessionInfo()
+  const { signIn } = useLogin()
 
-  const { isWhiteList, isWaitList } = useIsWhiteListKyberAI()
+  const { isWhiteList, isWaitList, loading: isCheckingPermission } = useIsWhiteListKyberAI()
 
   const [verifyModalState, setVerifyModalState] = useState({
     isOpen: false,
@@ -85,6 +86,13 @@ export default function RegisterWhitelist({ showForm = true }: { showForm?: bool
     />
   )
 
+  if (isCheckingPermission)
+    return (
+      <ConnectWalletButton disabled>
+        <Trans>Checking data...</Trans>
+      </ConnectWalletButton>
+    )
+
   if (!account)
     return (
       <ConnectWalletButton onClick={toggleWalletModal}>
@@ -94,13 +102,18 @@ export default function RegisterWhitelist({ showForm = true }: { showForm?: bool
 
   if (!isLogin)
     return (
-      <ConnectWalletButton onClick={() => KyberOauth2.authenticate({ wallet_address: account ?? '' })}>
+      <ConnectWalletButton onClick={() => signIn()}>
         <Trans>Sign-In to Continue</Trans>
       </ConnectWalletButton>
     )
 
   const btnGetStart = (
-    <ConnectWalletButton onClick={() => navigate(APP_PATHS.KYBERAI_RANKINGS)}>
+    <ConnectWalletButton
+      onClick={() => {
+        mixpanelHandler(MIXPANEL_TYPE.KYBERAI_GET_STARTED_CLICK)
+        navigate(APP_PATHS.KYBERAI_RANKINGS)
+      }}
+    >
       <Trans>Get Started</Trans>
     </ConnectWalletButton>
   )
@@ -120,7 +133,6 @@ export default function RegisterWhitelist({ showForm = true }: { showForm?: bool
         {btnGetStart}
         <div style={{ width: '100%', border: `1px solid ${theme.border}` }} />
         <WaitListForm
-          showRanking={false}
           desc={
             <Text fontSize={20} color={theme.text} fontWeight={'500'}>
               <Trans>Spread the word, and get rewarded for it! </Trans>
