@@ -14,7 +14,7 @@ import {
   ethereum,
   fantom,
   görli,
-  lineaTestnet,
+  linea,
   matic,
   mumbai,
   oasis,
@@ -25,13 +25,14 @@ import {
   zksync,
 } from './networks/index'
 import { EVMNetworkInfo } from './networks/type'
+import zkEvm from './networks/zkevm'
 
 type SOLANA_NETWORK = ChainId.SOLANA | ChainId.SOLANA_DEVNET
 
 type NETWORKS_INFO_CONFIG_TYPE = { [chainId in EVM_NETWORK]: EVMNetworkInfo } & {
   [chainId in SOLANA_NETWORK]: SolanaNetworkInfo
 }
-export const NETWORKS_INFO_CONFIG: NETWORKS_INFO_CONFIG_TYPE = {
+const NETWORKS_INFO_CONFIG: NETWORKS_INFO_CONFIG_TYPE = {
   [ChainId.MAINNET]: ethereum,
   [ChainId.GÖRLI]: görli,
   [ChainId.MATIC]: matic,
@@ -49,7 +50,8 @@ export const NETWORKS_INFO_CONFIG: NETWORKS_INFO_CONFIG_TYPE = {
   [ChainId.OASIS]: oasis,
   [ChainId.OPTIMISM]: optimism,
   [ChainId.ZKSYNC]: zksync,
-  [ChainId.LINEA_TESTNET]: lineaTestnet,
+  [ChainId.LINEA]: linea,
+  [ChainId.ZKEVM]: zkEvm,
   [ChainId.SOLANA]: solana,
   [ChainId.SOLANA_DEVNET]: solanaDevnet,
 } as const
@@ -63,25 +65,27 @@ export const NETWORKS_INFO = new Proxy(NETWORKS_INFO_CONFIG, {
   },
 })
 
-export const SUPPORTED_NETWORKS = Object.keys(NETWORKS_INFO).map(Number) as ChainId[]
+// temporary disable Solana
+// todo: either enable back or completely remove Solana from codebase
+export const SUPPORTED_NETWORKS = Object.keys(NETWORKS_INFO).map(Number).filter(isEVM) as ChainId[]
 
 export const MAINNET_NETWORKS = [
   ChainId.MAINNET,
-  ChainId.BSCMAINNET,
-  ChainId.MATIC,
-  ChainId.AVAXMAINNET,
   ChainId.ARBITRUM,
   ChainId.OPTIMISM,
-  ChainId.SOLANA,
-  ChainId.BTTC,
-  ChainId.OASIS,
+  ChainId.LINEA,
+  ChainId.MATIC,
+  ChainId.ZKEVM,
+  ChainId.ZKSYNC,
+  ChainId.BSCMAINNET,
+  ChainId.AVAXMAINNET,
+  // ChainId.SOLANA,
   ChainId.FANTOM,
+  ChainId.BTTC,
   ChainId.CRONOS,
   ChainId.VELAS,
+  ChainId.OASIS,
   ChainId.AURORA,
-  ChainId.ZKSYNC,
-  // TODO(viet-nv): update when integrating LINEA MAINNET
-  ChainId.LINEA_TESTNET,
 ] as const
 
 export const EVM_NETWORKS = SUPPORTED_NETWORKS.filter(chainId => getChainType(chainId) === ChainType.EVM) as Exclude<
@@ -162,7 +166,8 @@ export const STATIC_FEE_OPTIONS: { [chainId: number]: number[] | undefined } = {
   [ChainId.OPTIMISM]: [8, 10, 50, 300, 500, 1000],
   [ChainId.GÖRLI]: [8, 10, 50, 300, 500, 1000],
   [ChainId.ZKSYNC]: [8, 10, 50, 300, 500, 1000],
-  [ChainId.LINEA_TESTNET]: [8, 10, 50, 300, 500, 1000],
+  [ChainId.LINEA]: [8, 10, 50, 300, 500, 1000],
+  [ChainId.ZKEVM]: [8, 10, 50, 300, 500, 1000],
 }
 
 export const ONLY_STATIC_FEE_CHAINS = [
@@ -173,20 +178,12 @@ export const ONLY_STATIC_FEE_CHAINS = [
   ChainId.OPTIMISM,
   ChainId.GÖRLI,
   ChainId.ZKSYNC,
-  ChainId.LINEA_TESTNET,
+  ChainId.LINEA,
+  ChainId.ZKEVM,
 ]
 
 // hardcode for unavailable subgraph
 export const ONLY_DYNAMIC_FEE_CHAINS: ChainId[] = []
-
-// Keys are present_on_chains' value.
-export const TRENDING_SOON_SUPPORTED_NETWORKS: { [p: string]: ChainId } = {
-  eth: ChainId.MAINNET,
-  bsc: ChainId.BSCMAINNET,
-  polygon: ChainId.MATIC,
-  avax: ChainId.AVAXMAINNET,
-  fantom: ChainId.FANTOM,
-}
 
 export const CLAIM_REWARDS_DATA_URL: { [chainId: number]: string } = {
   [ChainId.AVAXMAINNET]:
@@ -201,5 +198,31 @@ export const DEFAULT_REWARDS: { [key: string]: string[] } = {
   [ChainId.MAINNET]: ['0x9F52c8ecbEe10e00D9faaAc5Ee9Ba0fF6550F511'],
 }
 
-// by pass invalid price impact/unable to calculate price impact/price impact too large
-export const CHAINS_BYPASS_PRICE_IMPACT = [ChainId.LINEA_TESTNET]
+export const SUPPORTED_NETWORKS_FOR_MY_EARNINGS = [
+  ChainId.MAINNET,
+  ChainId.ARBITRUM,
+  ChainId.OPTIMISM,
+  ChainId.MATIC,
+  ChainId.BSCMAINNET,
+  ChainId.AVAXMAINNET,
+  ChainId.FANTOM,
+  ChainId.CRONOS,
+  ChainId.BTTC,
+  ChainId.VELAS,
+  ChainId.AURORA,
+  ChainId.OASIS,
+]
+export const COMING_SOON_NETWORKS_FOR_MY_EARNINGS: ChainId[] = []
+export const COMING_SOON_NETWORKS_FOR_MY_EARNINGS_LEGACY: ChainId[] = []
+export const COMING_SOON_NETWORKS_FOR_MY_EARNINGS_CLASSIC: ChainId[] = [
+  ChainId.CRONOS,
+  ChainId.OASIS,
+  ChainId.MATIC,
+  ChainId.BSCMAINNET,
+  ChainId.AVAXMAINNET,
+  ChainId.CRONOS,
+  ChainId.BTTC,
+  ChainId.VELAS,
+  ChainId.AURORA,
+  ChainId.OASIS,
+]

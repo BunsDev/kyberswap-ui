@@ -173,9 +173,7 @@ export default function PoolCombination() {
   return (
     <>
       <PageWrapper style={{ paddingBottom: '24px' }}>
-        <AutoColumn>
-          <ClassicElasticTab />
-        </AutoColumn>
+        <ClassicElasticTab />
         {tab === VERSION.ELASTIC ? (
           <ProAmmPool />
         ) : tab === VERSION.ELASTIC_LEGACY ? (

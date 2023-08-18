@@ -149,7 +149,13 @@ export function getTradeComposition(
       return NativeCurrencies[chainId]
     }
 
-    return allTokens?.[isAddressString(chainId, address)] || tokens[address] || defaultToken
+    return (
+      allTokens?.[isAddressString(chainId, address)] ||
+      tokens[address] ||
+      (isAddressString(chainId, address)
+        ? new Token(chainId, isAddressString(chainId, address), 0, '--', '--')
+        : defaultToken)
+    )
   }
 
   // Convert all Swaps to ChartSwaps
@@ -190,18 +196,12 @@ export function getTradeComposition(
       })
 
       if (index === 0) {
-        const token = tokens[hop.tokenIn] || defaultToken
-        path.push(
-          allTokens?.[isAddressString(chainId, token.address)] ||
-            new Token(chainId, token.address, token.decimals, token.symbol, token.name),
-        )
+        const token = getTokenFromAddress(hop.tokenIn)
+        path.push(token)
       }
 
-      const token = allTokens?.[isAddressString(chainId, hop.tokenOut)] || tokens[hop.tokenOut] || defaultToken
-      path.push(
-        allTokens?.[isAddressString(chainId, token.address)] ||
-          new Token(chainId, token.address, token.decimals, token.symbol, token.name),
-      )
+      const token = getTokenFromAddress(hop.tokenOut)
+      path.push(token)
     })
     routes.push({
       slug: path

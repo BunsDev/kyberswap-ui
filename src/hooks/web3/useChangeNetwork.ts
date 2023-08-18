@@ -1,7 +1,6 @@
 import { ChainId } from '@kyberswap/ks-sdk-core'
 import { t } from '@lingui/macro'
 import { captureException } from '@sentry/react'
-import { Connector } from '@web3-react/types'
 import { useCallback } from 'react'
 
 import { NotificationType } from 'components/Announcement/type'
@@ -57,10 +56,9 @@ export function useChangeNetwork() {
 
   const failureCallback = useCallback(
     (
-      connector: Connector,
       desiredChainId: ChainId,
       error: any,
-      customFailureCallback?: (connector: Connector, error: Error) => void,
+      customFailureCallback?: (error: Error) => void,
       customTexts?: {
         name?: string
         title?: string
@@ -71,7 +69,7 @@ export function useChangeNetwork() {
       const title = customTexts?.title || t`Failed to switch network`
       let message: string = customTexts?.default || t`Error when changing network.`
 
-      if (didUserReject(connector, error)) {
+      if (didUserReject(error)) {
         message =
           customTexts?.rejected ||
           t`In order to use KyberSwap on ${
@@ -99,7 +97,7 @@ export function useChangeNetwork() {
         type: NotificationType.ERROR,
         summary: message,
       })
-      customFailureCallback?.(connector, error)
+      customFailureCallback?.(error)
     },
     [chainId, notify, walletEVM.walletKey],
   )
@@ -115,7 +113,7 @@ export function useChangeNetwork() {
         default?: string
       },
       customSuccessCallback?: () => void,
-      customFailureCallback?: (connector: Connector, error: Error) => void,
+      customFailureCallback?: (error: Error) => void,
       waitUtilUpdatedChainId = false,
     ) => {
       const wrappedSuccessCallback = () =>
@@ -141,11 +139,11 @@ export function useChangeNetwork() {
             method: 'wallet_addEthereumChain',
             params: [addChainParameter],
           })
-          changeNetworkHandler(desiredChainId, wrappedSuccessCallback)
+          wrappedSuccessCallback()
         } catch (error) {
           console.error('Add new network failed', { addChainParameter, error })
-          failureCallback(connector, desiredChainId, error, customFailureCallback, customTexts)
-          if (!didUserReject(connector, error)) {
+          failureCallback(desiredChainId, error, customFailureCallback, customTexts)
+          if (!didUserReject(error)) {
             const e = new Error(`[Wallet] ${error.message}`)
             e.name = 'Add new network Error'
             e.stack = ''
@@ -157,24 +155,16 @@ export function useChangeNetwork() {
         }
       }
     },
-    [
-      library?.provider,
-      chainId,
-      changeNetworkHandler,
-      connector,
-      failureCallback,
-      fetchKyberswapConfig,
-      successCallback,
-      walletEVM.walletKey,
-    ],
+    [library?.provider, chainId, failureCallback, fetchKyberswapConfig, successCallback, walletEVM.walletKey],
   )
 
   const changeNetwork = useCallback(
     async (
       desiredChainId: ChainId,
       customSuccessCallback?: () => void,
-      customFailureCallback?: (connector: Connector, error: Error) => void,
+      customFailureCallback?: (error: Error) => void,
       waitUtilUpdatedChainId = false,
+      isAddNetworkIfPossible = true,
     ) => {
       const wrappedSuccessCallback = () =>
         successCallback(desiredChainId, waitUtilUpdatedChainId, customSuccessCallback)
@@ -203,19 +193,29 @@ export function useChangeNetwork() {
           console.error('Switch network failed', { desiredChainId, error })
 
           // walletconnect v2 not support add network, so halt execution here
-          if (didUserReject(connector, error) || connector === walletConnectV2) {
-            failureCallback(connector, desiredChainId, error, customFailureCallback)
+          if (didUserReject(error) || connector === walletConnectV2) {
+            failureCallback(desiredChainId, error, customFailureCallback)
             return
           }
-
-          addNewNetwork(
-            desiredChainId,
-            undefined,
-            undefined,
-            customSuccessCallback,
-            customFailureCallback,
-            waitUtilUpdatedChainId,
-          )
+          if (isAddNetworkIfPossible) {
+            addNewNetwork(
+              desiredChainId,
+              undefined,
+              undefined,
+              () =>
+                changeNetwork(
+                  desiredChainId,
+                  customSuccessCallback,
+                  customFailureCallback,
+                  waitUtilUpdatedChainId,
+                  false,
+                ),
+              customFailureCallback,
+              waitUtilUpdatedChainId,
+            )
+          } else {
+            failureCallback(desiredChainId, error, customFailureCallback)
+          }
         }
       } else {
         changeNetworkHandler(desiredChainId, wrappedSuccessCallback)

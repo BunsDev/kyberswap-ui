@@ -26,7 +26,10 @@ export const useUserFarmV2Info = (farmAddress: string, fId: number): UserFarmV2I
   return useMemo(
     () =>
       userInfo?.filter(
-        item => item.fId === fId && item.farmAddress === farmAddress && item.liquidity.toString() !== '0',
+        item =>
+          item.fId === fId &&
+          item.farmAddress === farmAddress &&
+          (item.liquidity.toString() !== '0' || item.unclaimedRewards.some(item => item.greaterThan('0'))),
       ) || [],
     [fId, userInfo, farmAddress],
   )
@@ -314,7 +317,7 @@ export const useFarmV2Action = (farmAddress: string) => {
         })
 
         addTransactionWithType({ hash: tx.hash, type: TRANSACTION_TYPE.HARVEST })
-        return tx
+        return tx.hash
       } catch (e) {
         throw e
       }

@@ -23,6 +23,7 @@ import TransactionConfirmationModal, {
   ConfirmationModalContent,
   TransactionErrorContent,
 } from 'components/TransactionConfirmationModal'
+import { didUserReject } from 'constants/connectors/utils'
 import { AMP_HINT, APP_PATHS } from 'constants/index'
 import { EVMNetworkInfo } from 'constants/networks/type'
 import { NativeCurrencies } from 'constants/tokens'
@@ -32,6 +33,7 @@ import { useCurrency } from 'hooks/Tokens'
 import { ApprovalState, useApproveCallback } from 'hooks/useApproveCallback'
 import useTheme from 'hooks/useTheme'
 import useTransactionDeadline from 'hooks/useTransactionDeadline'
+import DisclaimerERC20 from 'pages/AddLiquidityV2/components/DisclaimerERC20'
 import { Dots, Wrapper } from 'pages/Pool/styleds'
 import { useWalletModalToggle } from 'state/application/hooks'
 import { Field } from 'state/mint/actions'
@@ -314,7 +316,7 @@ const TokenPair = ({
         e.name = 'AddLiquidityError'
         captureException(e, { extra: { args } })
         // we only care if the error is something _other_ than the user rejected the tx
-        if (err?.code !== 4001) {
+        if (!didUserReject(error)) {
           console.error(err)
         }
 
@@ -669,6 +671,10 @@ const TokenPair = ({
                 </Text>
               </Warning>
             )}
+
+            <DisclaimerERC20 href="https://docs.kyberswap.com/liquidity-solutions/kyberswap-elastic/user-guides/add-liquidity-to-an-existing-elastic-pool#non-standard-tokens" />
+
+            <div style={{ marginBottom: '1.5rem' }} />
 
             {!account ? (
               <ButtonLight onClick={toggleWalletModal}>

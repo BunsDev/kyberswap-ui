@@ -5,11 +5,12 @@ import { PublicKey } from '@solana/web3.js'
 import dayjs from 'dayjs'
 import JSBI from 'jsbi'
 import Numeral from 'numeral'
+import blockServiceApi from 'services/blockService'
 
 import { GET_BLOCKS } from 'apollo/queries'
-import { BLOCK_SERVICE_API, ENV_KEY } from 'constants/env'
+import { ENV_KEY } from 'constants/env'
 import { DEFAULT_GAS_LIMIT_MARGIN, ZERO_ADDRESS } from 'constants/index'
-import { NETWORKS_INFO, NETWORKS_INFO_CONFIG, isEVM } from 'constants/networks'
+import { NETWORKS_INFO, SUPPORTED_NETWORKS, isEVM } from 'constants/networks'
 import { KNC, KNCL_ADDRESS } from 'constants/tokens'
 import { EVMWalletInfo, SUPPORTED_WALLET, SolanaWalletInfo, WalletInfo } from 'constants/wallets'
 import store from 'state'
@@ -56,6 +57,7 @@ export function getEtherscanLink(
       return `${prefix}/tx/${data}`
     }
     case 'token': {
+      if (chainId === ChainId.ZKSYNC) return `${prefix}/address/${data}`
       return `${prefix}/token/${data}`
     }
     case 'block': {
@@ -165,12 +167,12 @@ const truncateFloatNumber = (num: number, maximumFractionDigits = 6) => {
   return `${wholePart}.${fractionalPart.slice(0, maximumFractionDigits)}`
 }
 
-export function formattedNum(number: string, usd = false, fractionDigits = 5): string {
-  if (number === '' || number === undefined) {
+export function formattedNum(number: string | number, usd = false, fractionDigits = 5): string {
+  if (number === 0 || number === '' || number === undefined) {
     return usd ? '$0' : '0'
   }
 
-  const num = parseFloat(number)
+  const num = parseFloat(String(number))
 
   if (num > 500000000) {
     return (usd ? '$' : '') + toK(num.toFixed(0))
@@ -252,7 +254,6 @@ export async function splitQuery<ResultType, T, U>(
   localClient: ApolloClient<NormalizedCacheObject>,
   list: T[],
   vars: U[],
-  signal: AbortSignal,
   skipCount = 100,
 ): Promise<
   | {
@@ -273,11 +274,6 @@ export async function splitQuery<ResultType, T, U>(
     const result = await localClient.query({
       query: query(sliced, ...vars),
       fetchPolicy: 'no-cache',
-      context: {
-        fetchOptions: {
-          signal,
-        },
-      },
     })
     fetchedData = {
       ...fetchedData,
@@ -300,24 +296,17 @@ export async function splitQuery<ResultType, T, U>(
  * @dev timestamps are returns as they were provided; not the block time.
  * @param {Array} timestamps
  */
-export async function getBlocksFromTimestampsSubgraph(
+async function getBlocksFromTimestampsSubgraph(
   blockClient: ApolloClient<NormalizedCacheObject>,
   timestamps: number[],
   chainId: ChainId,
-  signal: AbortSignal,
 ): Promise<{ timestamp: number; number: number }[]> {
   if (!isEVM(chainId)) return []
   if (timestamps?.length === 0) {
     return []
   }
 
-  const fetchedData = await splitQuery<{ number: string }[], number, any>(
-    GET_BLOCKS,
-    blockClient,
-    timestamps,
-    [],
-    signal,
-  )
+  const fetchedData = await splitQuery<{ number: string }[], number, any>(GET_BLOCKS, blockClient, timestamps, [])
   const blocks: { timestamp: number; number: number }[] = []
   if (fetchedData) {
     for (const t in fetchedData) {
@@ -333,31 +322,24 @@ export async function getBlocksFromTimestampsSubgraph(
   return blocks
 }
 
-export async function getBlocksFromTimestampsBlockService(
+async function getBlocksFromTimestampsBlockService(
   timestamps: number[],
   chainId: ChainId,
-  signal: AbortSignal,
 ): Promise<{ timestamp: number; number: number }[]> {
   if (!isEVM(chainId)) return []
   if (timestamps?.length === 0) {
     return []
   }
+
   const allChunkResult = (
     await Promise.all(
       chunk(timestamps, 50).map(
         async timestampsChunk =>
-          (
-            await fetch(
-              `${BLOCK_SERVICE_API}/${
-                NETWORKS_INFO[chainId].aggregatorRoute
-              }/api/v1/block?timestamps=${timestampsChunk.join(',')}`,
-              { signal },
-            )
-          ).json() as Promise<{ data: { timestamp: number; number: number }[] }>,
+          await store.dispatch(blockServiceApi.endpoints.getBlocks.initiate({ chainId, timestamps: timestampsChunk })),
       ),
     )
   )
-    .map(chunk => chunk.data)
+    .map(chunk => chunk.data?.data || [])
     .flat()
     .sort((a, b) => a.number - b.number)
 
@@ -369,10 +351,9 @@ export async function getBlocksFromTimestamps(
   blockClient: ApolloClient<NormalizedCacheObject>,
   timestamps: number[],
   chainId: ChainId,
-  signal: AbortSignal,
 ): Promise<{ timestamp: number; number: number }[]> {
-  if (isEnableBlockService) return getBlocksFromTimestampsBlockService(timestamps, chainId, signal)
-  return getBlocksFromTimestampsSubgraph(blockClient, timestamps, chainId, signal)
+  if (isEnableBlockService) return getBlocksFromTimestampsBlockService(timestamps, chainId)
+  return getBlocksFromTimestampsSubgraph(blockClient, timestamps, chainId)
 }
 
 /**
@@ -519,8 +500,9 @@ export const isChristmasTime = () => {
   return currentTime.month() === 11 && currentTime.date() >= 15
 }
 
-export const getLimitOrderContract = (chainId: ChainId) => {
-  const { production, development } = NETWORKS_INFO_CONFIG[chainId]?.limitOrder ?? {}
+export const getLimitOrderContract = (chainId: ChainId): string | null => {
+  if (!SUPPORTED_NETWORKS.includes(chainId)) return null
+  const { production, development } = NETWORKS_INFO[chainId]?.limitOrder ?? {}
   return ENV_KEY === 'production' || ENV_KEY === 'staging' ? production : development
 }
 
@@ -539,4 +521,14 @@ export function openFullscreen(elem: any) {
     /* IE11 */
     elem.msRequestFullscreen()
   }
+}
+
+export const downloadImage = (data: Blob | string | undefined, filename: string) => {
+  if (!data) return
+  const link = document.createElement('a')
+  link.download = filename
+  link.href = typeof data === 'string' ? data : URL.createObjectURL(data)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }

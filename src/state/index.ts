@@ -1,5 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit'
 import { load, save } from 'redux-localstorage-simple'
+import blockServiceApi from 'services/blockService'
+import coingeckoApi from 'services/coingecko'
 import kyberAISubscriptionApi from 'services/kyberAISubscription'
 import priceAlertApi from 'services/priceAlert'
 import routeApi from 'services/route'
@@ -11,9 +13,11 @@ import kyberAIApi from 'pages/TrueSightV2/hooks/useKyberAIData'
 
 import announcementApi, { publicAnnouncementApi } from '../services/announcement'
 import crosschainApi from '../services/crossChain'
+import earningApi from '../services/earning'
 import geckoTerminalApi from '../services/geckoTermial'
 import identifyApi from '../services/identity'
 import ksSettingApi from '../services/ksSetting'
+import kyberDAO from '../services/kyberDAO'
 import socialApi from '../services/social'
 import application from './application/reducer'
 import authen from './authen/reducer'
@@ -31,6 +35,7 @@ import lists from './lists/reducer'
 import mintV2 from './mint/proamm/reducer'
 import mint from './mint/reducer'
 import multicall from './multicall/reducer'
+import myEarnings from './myEarnings/reducer'
 import pair from './pair/reducer'
 import pools from './pools/reducer'
 import profile from './profile/reducer'
@@ -39,11 +44,30 @@ import tokenPrices from './tokenPrices'
 import topTokens from './topTokens'
 import transactions from './transactions/reducer'
 import tutorial from './tutorial/reducer'
-import user from './user/reducer'
+import user, { UserState } from './user/reducer'
 import vesting from './vesting/reducer'
 
 const PERSISTED_KEYS: string[] = ['user', 'transactions', 'profile']
 ENV_LEVEL < ENV_TYPE.PROD && PERSISTED_KEYS.push('customizeDexes')
+
+// Migrate from old version to new version, prevent lost favorite tokens of user
+const preloadedState: any = load({ states: PERSISTED_KEYS })
+if ('user' in preloadedState) {
+  const userState: UserState = preloadedState.user
+  if (userState.favoriteTokensByChainId) {
+    userState.favoriteTokensByChainIdv2 = Object.entries(userState.favoriteTokensByChainId).reduce(
+      (acc, [chainId, obj]) => {
+        acc[chainId] = {}
+        obj.addresses.forEach((address: string) => {
+          acc[chainId][address.toLowerCase()] = true
+        })
+        return acc
+      },
+      {} as any,
+    )
+    userState.favoriteTokensByChainId = undefined
+  }
+}
 
 const store = configureStore({
   devTools: process.env.NODE_ENV !== 'production',
@@ -68,8 +92,11 @@ const store = configureStore({
     [announcementApi.reducerPath]: announcementApi.reducer,
     [publicAnnouncementApi.reducerPath]: publicAnnouncementApi.reducer,
     [geckoTerminalApi.reducerPath]: geckoTerminalApi.reducer,
+    [coingeckoApi.reducerPath]: coingeckoApi.reducer,
+
     [kyberAIApi.reducerPath]: kyberAIApi.reducer,
     [kyberAISubscriptionApi.reducerPath]: kyberAISubscriptionApi.reducer,
+    [kyberDAO.reducerPath]: kyberDAO.reducer,
     [identifyApi.reducerPath]: identifyApi.reducer,
     [ksSettingApi.reducerPath]: ksSettingApi.reducer,
     [crosschainApi.reducerPath]: crosschainApi.reducer,
@@ -77,6 +104,7 @@ const store = configureStore({
     [socialApi.reducerPath]: socialApi.reducer,
     campaigns,
     tutorial,
+    myEarnings,
     crossChain,
     customizeDexes,
     elasticFarm,
@@ -84,27 +112,31 @@ const store = configureStore({
     tokenPrices,
     topTokens,
     [routeApi.reducerPath]: routeApi.reducer,
+    [earningApi.reducerPath]: earningApi.reducer,
     [tokenApi.reducerPath]: tokenApi.reducer,
     [socialApi.reducerPath]: socialApi.reducer,
+    [blockServiceApi.reducerPath]: blockServiceApi.reducer,
   },
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware({ thunk: true, immutableCheck: false, serializableCheck: false })
       .concat(save({ states: PERSISTED_KEYS, debounce: 100 }))
       .concat(geckoTerminalApi.middleware)
+      .concat(coingeckoApi.middleware)
       .concat(kyberAIApi.middleware)
       .concat(kyberAISubscriptionApi.middleware)
-      .concat(identifyApi.middleware)
       .concat(announcementApi.middleware)
       .concat(publicAnnouncementApi.middleware)
-      .concat(kyberAISubscriptionApi.middleware)
+      .concat(kyberDAO.middleware)
       .concat(identifyApi.middleware)
       .concat(ksSettingApi.middleware)
       .concat(crosschainApi.middleware)
       .concat(priceAlertApi.middleware)
       .concat(routeApi.middleware)
+      .concat(earningApi.middleware)
       .concat(socialApi.middleware)
-      .concat(tokenApi.middleware),
-  preloadedState: load({ states: PERSISTED_KEYS }),
+      .concat(tokenApi.middleware)
+      .concat(blockServiceApi.middleware),
+  preloadedState,
 })
 
 const PREFIX_REDUX_PERSIST = 'redux_localstorage_simple_'

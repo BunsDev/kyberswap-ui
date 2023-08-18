@@ -3,7 +3,8 @@ import { useCallback, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useGetParticipantInfoQuery } from 'services/kyberAISubscription'
 
-import { DEFAULT_SLIPPAGE_TESTNET, TERM_FILES_PATH } from 'constants/index'
+import { SUGGESTED_BASES } from 'constants/bases'
+import { TERM_FILES_PATH } from 'constants/index'
 import { SupportedLocale } from 'constants/locales'
 import { PINNED_PAIRS } from 'constants/tokens'
 import { useActiveWeb3React } from 'hooks'
@@ -16,6 +17,7 @@ import {
 import useDebounce from 'hooks/useDebounce'
 import { ParticipantInfo, ParticipantStatus } from 'pages/TrueSightV2/types'
 import { AppDispatch, AppState } from 'state'
+import { useKyberSwapConfig } from 'state/application/hooks'
 import { useIsConnectingWallet, useSessionInfo } from 'state/authen/hooks'
 import { useAppDispatch, useAppSelector } from 'state/hooks'
 import { WrappedTokenInfo } from 'state/lists/wrappedTokenInfo'
@@ -36,7 +38,7 @@ import {
   toggleKyberAIBanner,
   toggleKyberAIWidget,
   toggleLiveChart,
-  toggleTokenInfo,
+  toggleMyEarningChart,
   toggleTopTrendingTokens,
   toggleTradeRoutes,
   updateAcceptedTermVersion,
@@ -46,10 +48,11 @@ import {
   updateUserDegenMode,
   updateUserLocale,
   updateUserSlippageTolerance,
-  updateUserSlippageToleranceForLineaTestnet,
 } from 'state/user/actions'
-import { CROSS_CHAIN_SETTING_DEFAULT, CrossChainSetting, VIEW_MODE, getFavoriteTokenDefault } from 'state/user/reducer'
+import { CROSS_CHAIN_SETTING_DEFAULT, CrossChainSetting, VIEW_MODE } from 'state/user/reducer'
 import { isAddress, isChristmasTime } from 'utils'
+
+const MAX_FAVORITE_LIMIT = 12
 
 function serializeToken(token: Token | WrappedTokenInfo): SerializedToken {
   return {
@@ -149,23 +152,15 @@ export function useDegenModeManager(): [boolean, () => void] {
 
 export function useUserSlippageTolerance(): [number, (slippage: number) => void] {
   const dispatch = useDispatch<AppDispatch>()
-  const { chainId } = useActiveWeb3React()
-  const isLineaTestnet = chainId === ChainId.LINEA_TESTNET
   const userSlippageTolerance = useSelector<AppState, AppState['user']['userSlippageTolerance']>(state => {
-    return isLineaTestnet
-      ? state.user.userSlippageToleranceForLineaTestnet || DEFAULT_SLIPPAGE_TESTNET
-      : state.user.userSlippageTolerance
+    return state.user.userSlippageTolerance
   })
 
   const setUserSlippageTolerance = useCallback(
     (userSlippageTolerance: number) => {
-      if (isLineaTestnet) {
-        dispatch(updateUserSlippageToleranceForLineaTestnet({ userSlippageTolerance }))
-      } else {
-        dispatch(updateUserSlippageTolerance({ userSlippageTolerance }))
-      }
+      dispatch(updateUserSlippageTolerance({ userSlippageTolerance }))
     },
-    [dispatch, isLineaTestnet],
+    [dispatch],
   )
 
   return [userSlippageTolerance, setUserSlippageTolerance]
@@ -351,10 +346,6 @@ export function useShowTradeRoutes(): boolean {
   return showTradeRoutes
 }
 
-export function useShowTokenInfo(): boolean {
-  return useSelector((state: AppState) => state.user.showTokenInfo) ?? true
-}
-
 export function useShowKyberAIBanner(): boolean {
   return useSelector((state: AppState) => state.user.showKyberAIBanner) ?? true
 }
@@ -378,10 +369,6 @@ export function useToggleTradeRoutes(): () => void {
   return useCallback(() => dispatch(toggleTradeRoutes()), [dispatch])
 }
 
-export function useToggleTokenInfo(): () => void {
-  const dispatch = useDispatch<AppDispatch>()
-  return useCallback(() => dispatch(toggleTokenInfo()), [dispatch])
-}
 export function useToggleKyberAIBanner(): () => void {
   const dispatch = useDispatch<AppDispatch>()
   return useCallback(() => dispatch(toggleKyberAIBanner()), [dispatch])
@@ -394,18 +381,35 @@ export function useToggleTopTrendingTokens(): () => void {
 
 export const useUserFavoriteTokens = (chainId: ChainId) => {
   const dispatch = useDispatch<AppDispatch>()
-  const { favoriteTokensByChainId } = useSelector((state: AppState) => state.user)
+  const { favoriteTokensByChainIdv2: favoriteTokensByChainId } = useSelector((state: AppState) => state.user)
+  const { commonTokens } = useKyberSwapConfig(chainId)
+  const defaultTokens = useMemo(() => {
+    return commonTokens || SUGGESTED_BASES[chainId || ChainId.MAINNET].map(e => e.address)
+  }, [commonTokens, chainId])
 
   const favoriteTokens = useMemo(() => {
     if (!chainId) return undefined
-    return favoriteTokensByChainId
-      ? favoriteTokensByChainId[chainId] || getFavoriteTokenDefault(chainId)
-      : getFavoriteTokenDefault(chainId)
-  }, [chainId, favoriteTokensByChainId])
+    const favoritedTokens = favoriteTokensByChainId?.[chainId] || {}
+    const favoritedTokenAddresses = defaultTokens
+      .filter(address => favoritedTokens[address.toLowerCase()] !== false)
+      .concat(Object.keys(favoritedTokens).filter(address => favoritedTokens[address]))
+
+    return [...new Set(favoritedTokenAddresses.map(a => a.toLowerCase()))]
+  }, [chainId, favoriteTokensByChainId, defaultTokens])
 
   const toggleFavoriteToken = useCallback(
-    (payload: ToggleFavoriteTokenPayload) => dispatch(toggleFavoriteTokenAction(payload)),
-    [dispatch],
+    (payload: ToggleFavoriteTokenPayload) => {
+      if (!favoriteTokens) return
+      const address = payload.address.toLowerCase()
+      // Is adding favorite and reached max limit
+      if (favoriteTokens.indexOf(address) < 0 && favoriteTokens.length >= MAX_FAVORITE_LIMIT) {
+        return
+      }
+      const newValue = favoriteTokens.indexOf(address) < 0
+
+      dispatch(toggleFavoriteTokenAction({ ...payload, newValue }))
+    },
+    [dispatch, favoriteTokens],
   )
 
   return { favoriteTokens, toggleFavoriteToken }
@@ -517,14 +521,11 @@ export const useIsWhiteListKyberAI = () => {
   const loadingDebounced = useDebounce(isLoading, 500) || connectingWallet
 
   const participantInfo = isError || loadingDebounced || !account ? participantDefault : rawData
-  // isWhitelist, isWaitList check account is hotfix for now, will remove utils backend fixed bug
   return {
     loading: loadingDebounced,
     isWhiteList:
-      !!account &&
-      isLogin &&
-      (participantInfo?.status === ParticipantStatus.WHITELISTED || userInfo?.data?.hasAccessToKyberAI),
-    isWaitList: !!account && isLogin && participantInfo?.status === ParticipantStatus.WAITLISTED,
+      isLogin && (participantInfo?.status === ParticipantStatus.WHITELISTED || userInfo?.data?.hasAccessToKyberAI),
+    isWaitList: isLogin && participantInfo?.status === ParticipantStatus.WAITLISTED,
     refetch,
   }
 }
@@ -551,4 +552,16 @@ export const usePermitData: (
   const permitData = useAppSelector(state => state.user.permitData)
 
   return address && account && permitData ? permitData[account]?.[chainId]?.[address] : null
+}
+
+export const useShowMyEarningChart: () => [boolean, () => void] = () => {
+  const dispatch = useAppDispatch()
+
+  const isShowMyEarningChart = useAppSelector(state =>
+    state.user.myEarningChart === undefined ? true : state.user.myEarningChart,
+  )
+  const toggle = useCallback(() => {
+    dispatch(toggleMyEarningChart())
+  }, [dispatch])
+  return [isShowMyEarningChart, toggle]
 }

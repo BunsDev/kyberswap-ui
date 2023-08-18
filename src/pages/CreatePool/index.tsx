@@ -21,6 +21,7 @@ import QuestionHelper from 'components/QuestionHelper'
 import Row, { AutoRow, RowBetween, RowFlat } from 'components/Row'
 import TransactionConfirmationModal, { ConfirmationModalContent } from 'components/TransactionConfirmationModal'
 import { TutorialType } from 'components/Tutorial'
+import { didUserReject } from 'constants/connectors/utils'
 import { APP_PATHS, CREATE_POOL_AMP_HINT } from 'constants/index'
 import { ONLY_DYNAMIC_FEE_CHAINS, ONLY_STATIC_FEE_CHAINS, STATIC_FEE_OPTIONS } from 'constants/networks'
 import { EVMNetworkInfo } from 'constants/networks/type'
@@ -32,6 +33,7 @@ import { ApprovalState, useApproveCallback } from 'hooks/useApproveCallback'
 import useMixpanel, { MIXPANEL_TYPE } from 'hooks/useMixpanel'
 import useTheme from 'hooks/useTheme'
 import useTransactionDeadline from 'hooks/useTransactionDeadline'
+import DisclaimerERC20 from 'pages/AddLiquidityV2/components/DisclaimerERC20'
 import { Dots, Wrapper } from 'pages/Pool/styleds'
 import { useWalletModalToggle } from 'state/application/hooks'
 import { Field } from 'state/mint/actions'
@@ -286,7 +288,7 @@ export default function CreatePool() {
             setAttemptingTxn(false)
             setShowConfirm(false)
             // we only care if the error is something _other_ than the user rejected the tx
-            if (error?.code !== 4001) {
+            if (!didUserReject(error)) {
               console.error(error)
             }
           })
@@ -295,7 +297,7 @@ export default function CreatePool() {
         setAttemptingTxn(false)
         setShowConfirm(false)
         // we only care if the error is something _other_ than the user rejected the tx
-        if (error?.code !== 4001) {
+        if (!didUserReject(error)) {
           console.error(error)
         }
       })
@@ -733,6 +735,8 @@ export default function CreatePool() {
                     </Text>
                   </Warning>
                 )}
+
+                <DisclaimerERC20 href="https://docs.kyberswap.com/liquidity-solutions/kyberswap-classic/user-guides/classic-pool-creation#non-standard-tokens" />
 
                 {!account ? (
                   <ButtonLight onClick={toggleWalletModal}>

@@ -8,6 +8,7 @@ import JSBI from 'jsbi'
 import { useEffect, useRef, useState } from 'react'
 
 import TickReaderABI from 'constants/abis/v2/ProAmmTickReader.json'
+import { didUserReject } from 'constants/connectors/utils'
 import { EVMNetworkInfo } from 'constants/networks/type'
 import { useActiveWeb3React, useWeb3React } from 'hooks'
 import { useTransactionAdder } from 'state/transactions/hooks'
@@ -27,6 +28,7 @@ export const config: {
     subgraphUrl: string
     farmContract?: string
     positionManagerContract: string
+    tickReaderContract: string
   }
 } = {
   [ChainId.MAINNET]: {
@@ -34,64 +36,75 @@ export const config: {
       'https://ethereum-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-ethereum-legacy',
     farmContract: '0xb85ebe2e4ea27526f817ff33fb55fb240057c03f',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
   [ChainId.BSCMAINNET]: {
     subgraphUrl: 'https://bsc-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-bsc-legacy',
     farmContract: '',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
   [ChainId.ARBITRUM]: {
     subgraphUrl:
       'https://arbitrum-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-arbitrum-legacy',
     farmContract: '0xbdec4a045446f583dc564c0a227ffd475b329bf0',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
   [ChainId.AVAXMAINNET]: {
     subgraphUrl:
       'https://avalanche-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-avalanche-legacy',
     farmContract: '0xbdec4a045446f583dc564c0a227ffd475b329bf0',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
   [ChainId.OPTIMISM]: {
     subgraphUrl:
       'https://optimism-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-optimism-legacy',
     farmContract: '0xb85ebe2e4ea27526f817ff33fb55fb240057c03f',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
   [ChainId.MATIC]: {
     subgraphUrl:
       'https://polygon-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-polygon-legacy',
     farmContract: '0xbdec4a045446f583dc564c0a227ffd475b329bf0',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
   [ChainId.FANTOM]: {
     subgraphUrl: 'https://fantom-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-fantom-legacy',
     farmContract: '',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
 
   [ChainId.BTTC]: {
     subgraphUrl: 'https://bttc-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-bttc-legacy',
     farmContract: '',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
 
   [ChainId.CRONOS]: {
     subgraphUrl: 'https://cronos-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-cronos-legacy',
     farmContract: '',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
 
   [ChainId.VELAS]: {
     subgraphUrl: 'https://velas-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-velas-legacy',
     farmContract: '',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
 
   [ChainId.OASIS]: {
     subgraphUrl: 'https://oasis-graph.kyberengineering.io/subgraphs/name/kybernetwork/kyberswap-elastic-oasis-legacy',
     farmContract: '',
     positionManagerContract: '0x2B1c7b41f6A8F2b2bc45C3233a5d5FB3cD6dC9A8',
+    tickReaderContract: '0x165c68077ac06c83800d19200e6E2B08D02dE75D',
   },
 }
 
@@ -452,7 +465,7 @@ export const useRemoveLiquidityLegacy = (
         setShowPendingModal('removeLiquidity')
         setAttemptingTxn(false)
 
-        if (error?.code !== 'ACTION_REJECTED') {
+        if (!didUserReject(error)) {
           const e = new Error('Remove Legacy Elastic Liquidity Error', { cause: error })
           e.name = ErrorName.RemoveElasticLiquidityError
           captureException(e, {

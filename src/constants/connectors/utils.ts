@@ -1,6 +1,3 @@
-import { Connector } from '@web3-react/types'
-
-import { coinbaseWallet, walletConnectV2 } from 'constants/connectors/evm'
 import checkForBraveBrowser from 'utils/checkForBraveBrowser'
 
 export const getIsInjected = () => Boolean(window.ethereum)
@@ -50,20 +47,25 @@ export enum ErrorCode {
   CHAIN_NOT_ADDED = 4902,
   MM_ALREADY_PENDING = -32002,
 
-  WC_MODAL_CLOSED = 'Error: User closed modal',
-  CB_REJECTED_REQUEST = 'Error: User denied account authorization',
-  ALPHA_WALLET_USER_REJECTED_REQUEST = -32050,
+  ACTION_REJECTED = 'ACTION_REJECTED',
+  WALLETCONNECT_MODAL_CLOSED = 'Error: User closed modal',
+  WALLETCONNECT_CANCELED = 'The transaction was cancelled',
+  COINBASE_REJECTED_REQUEST = 'Error: User denied account authorization',
+  ALPHA_WALLET_REJECTED_CODE = -32050,
   ALPHA_WALLET_REJECTED = 'Request rejected',
-  CANCELED = 'The transaction was cancelled',
 }
 
-export function didUserReject(connector: Connector, error: any): boolean {
+const rejectedPhrases: string[] = ['user rejected transaction', 'user denied transaction', 'you must accept']
+
+export function didUserReject(error: any): boolean {
   return (
     error?.code === ErrorCode.USER_REJECTED_REQUEST ||
-    error?.code === ErrorCode.ALPHA_WALLET_USER_REJECTED_REQUEST ||
+    error?.code === ErrorCode.ACTION_REJECTED ||
+    error?.code === ErrorCode.ALPHA_WALLET_REJECTED_CODE ||
     error?.message === ErrorCode.ALPHA_WALLET_REJECTED ||
-    (connector === walletConnectV2 && error?.toString?.() === ErrorCode.WC_MODAL_CLOSED) ||
-    (connector === walletConnectV2 && error?.message === ErrorCode.CANCELED) ||
-    (connector === coinbaseWallet && error?.toString?.() === ErrorCode.CB_REJECTED_REQUEST)
+    error?.message === ErrorCode.WALLETCONNECT_MODAL_CLOSED ||
+    error?.message === ErrorCode.WALLETCONNECT_CANCELED ||
+    error?.message === ErrorCode.WALLETCONNECT_MODAL_CLOSED ||
+    rejectedPhrases.some(phrase => error?.message?.toLowerCase?.()?.includes?.(phrase.toLowerCase()))
   )
 }

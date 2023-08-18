@@ -6,6 +6,7 @@ import { Connection } from '@solana/web3.js'
 import { KS_SETTING_API } from 'constants/env'
 import { AppJsonRpcProvider } from 'constants/providers'
 import { TokenInfo } from 'state/lists/wrappedTokenInfo'
+import { TopToken } from 'state/topTokens/type'
 
 export type KyberSwapConfig = {
   rpc: string
@@ -16,6 +17,7 @@ export type KyberSwapConfig = {
   elasticClient: ApolloClient<NormalizedCacheObject>
   readProvider: AppJsonRpcProvider | undefined
   connection: Connection | undefined
+  commonTokens?: string[]
 }
 
 export type KyberSwapConfigResponse = {
@@ -25,6 +27,7 @@ export type KyberSwapConfigResponse = {
   blockSubgraph: string
   classicSubgraph: string
   elasticSubgraph: string
+  commonTokens?: string[]
 }
 
 export type KyberswapConfigurationResponse = {
@@ -42,12 +45,12 @@ export type KyberswapGlobalConfigurationResponse = {
   }
 }
 
-export interface TokenListResponse {
+export interface TokenListResponse<T = TokenInfo> {
   data: {
     pageination: {
       totalItems: number
     }
-    tokens: Array<TokenInfo>
+    tokens: Array<T>
   }
 }
 
@@ -77,16 +80,24 @@ const ksSettingApi = createApi({
 
     getTokenList: builder.query<
       TokenListResponse,
-      { chainId: number; page: number; pageSize: number; isWhitelisted: boolean }
+      { chainId: number; page?: number; pageSize?: number; isWhitelisted?: boolean; isStable?: boolean }
     >({
-      query: ({ chainId, page, pageSize, isWhitelisted }) => ({
+      query: ({ chainId, ...params }) => ({
         url: `/tokens`,
-        params: {
-          chainIds: chainId,
-          page,
-          pageSize,
-          isWhitelisted,
-        },
+        params: { ...params, chainIds: chainId },
+      }),
+    }),
+    importToken: builder.mutation<TokenListResponse, Array<{ chainId: string; address: string }>>({
+      query: tokens => ({
+        url: `/tokens/import`,
+        body: { tokens },
+        method: 'POST',
+      }),
+    }),
+    getTopTokens: builder.query<TokenListResponse<TopToken>, { chainId: number; page: number }>({
+      query: params => ({
+        url: `/tokens/popular`,
+        params,
       }),
     }),
   }),
@@ -97,6 +108,9 @@ export const {
   useLazyGetKyberswapConfigurationQuery,
   useGetKyberswapGlobalConfigurationQuery,
   useLazyGetTokenListQuery,
+  useGetTokenListQuery,
+  useImportTokenMutation,
+  useLazyGetTopTokensQuery,
 } = ksSettingApi
 
 export default ksSettingApi

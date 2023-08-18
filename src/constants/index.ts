@@ -12,6 +12,9 @@ import { ENV_TYPE } from './type'
 
 export const EMPTY_OBJECT: any = {}
 export const EMPTY_ARRAY: any[] = []
+export const EMPTY_FUNCTION = () => {
+  // empty
+}
 
 export const BAD_RECIPIENT_ADDRESSES: string[] = [
   NETWORKS_INFO[ChainId.MAINNET].classic.static.factory,
@@ -138,7 +141,9 @@ export const BLOCKED_PRICE_IMPACT_NON_DEGEN: Percent = new Percent(JSBI.BigInt(1
 
 export const BUNDLE_ID = '1'
 
+export const COINGECKO_BFF_API_URL = `${ENV.BFF_API}/v1/coingecko/api/v3`
 export const COINGECKO_API_URL = 'https://api.coingecko.com/api/v3'
+
 export const KNC_COINGECKO_ID = 'kyber-network-crystal'
 
 export const ETHER_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
@@ -192,7 +197,6 @@ export const DEFAULT_SLIPPAGES = [5, 10, 50, 100]
 
 export const DEFAULT_SLIPPAGE = 50
 export const DEFAULT_SLIPPAGE_STABLE_PAIR_SWAP = 5
-export const DEFAULT_SLIPPAGE_TESTNET = 1000
 
 export const AGGREGATOR_WAITING_TIME = 1700 // 1700 means that we at least show '.' '..' '...' '.' '..' '...'
 
@@ -210,6 +214,7 @@ export const APP_PATHS = {
   ELASTIC_REMOVE_POOL: '/elastic/remove',
   FARMS: '/farms',
   MY_POOLS: '/myPools',
+  MY_EARNINGS: '/my-earnings',
   DISCOVER: '/discover',
   KYBERAI: '/KyberAI',
   KYBERAI_ABOUT: '/KyberAI/About',
@@ -230,10 +235,10 @@ export const APP_PATHS = {
 } as const
 
 export const TERM_FILES_PATH = {
-  KYBERSWAP_TERMS: '/files/Kyber - Terms of Service - 14 June 2023.pdf',
+  KYBERSWAP_TERMS: '/files/Kyber - Terms of Service - 1 August 2023.pdf',
   PRIVACY_POLICY: '/files/privacy.pdf',
   // Timestamp of changed date, update this to latest timestamp whenever change any above files. This also used to check on client side for updated to force user to disconnect and re-accept terms.
-  VERSION: 1686700800000,
+  VERSION: 1690848000000,
 }
 
 export enum FARM_TAB {
@@ -311,29 +316,11 @@ export const CHAINS_SUPPORT_CROSS_CHAIN =
         ChainId.ARBITRUM,
         ChainId.OPTIMISM,
         ChainId.FANTOM,
+        ChainId.LINEA,
       ]
-    : [
-        ChainId.MAINNET,
-        ChainId.GÖRLI,
-        ChainId.MATIC,
-        ChainId.MUMBAI,
-        ChainId.BSCTESTNET,
-        ChainId.BSCMAINNET,
-        ChainId.AVAXTESTNET,
-        ChainId.AVAXMAINNET,
-        ChainId.FANTOM,
-        ChainId.CRONOS,
-        ChainId.ARBITRUM,
-        ChainId.BTTC,
-        ChainId.VELAS,
-        ChainId.AURORA,
-        ChainId.OASIS,
-        ChainId.OPTIMISM,
-        ChainId.ZKSYNC,
-        ChainId.SOLANA,
-      ]
+    : SUPPORTED_NETWORKS
 
-export const TYPE_AND_SWAP_NOT_SUPPORTED_CHAINS: ChainId[] = [ChainId.ZKSYNC, ChainId.LINEA_TESTNET]
+export const TYPE_AND_SWAP_NOT_SUPPORTED_CHAINS: ChainId[] = [ChainId.ZKSYNC, ChainId.LINEA, ChainId.ZKEVM]
 
 export const SWAP_FEE_RECEIVER_ADDRESS = '0x4f82e73EDb06d29Ff62C91EC8f5Ff06571bdeb29'
 
@@ -343,3 +330,52 @@ export const AGGREGATOR_API_PATHS = {
   BUILD_ROUTE: '/api/v1/route/build',
   GET_ROUTE: '/api/v1/routes',
 }
+
+export const ICON_IDS = [
+  'truesight-v2',
+  'notification-2',
+  'bullish',
+  'bearish',
+  'trending-soon',
+  'flame',
+  'download',
+  'upload',
+  'coin-bag',
+  'check',
+  'pig',
+  'speaker',
+  'share',
+  'liquid-outline',
+  'refund',
+  'swap',
+  'copy',
+  'open-link',
+  'star',
+  'fullscreen',
+  'leaderboard',
+  'liquid',
+  'alarm',
+  'on-chain',
+  'technical-analysis',
+  'news',
+  'arrow',
+  'chart',
+  'lightbulb',
+  'info',
+  'question',
+  'timer',
+  'search',
+  'devices',
+  'eth-mono',
+  'ava-mono',
+  'bnb-mono',
+  'matic-mono',
+  'fantom-mono',
+  'optimism-mono',
+  'arbitrum-mono',
+  'telegram',
+  'twitter',
+  'facebook',
+  'discord',
+] as const
+export type ICON_ID = typeof ICON_IDS[number]

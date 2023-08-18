@@ -2,7 +2,6 @@ import { Trans } from '@lingui/macro'
 import { Flex } from 'rebass'
 import styled, { css } from 'styled-components'
 
-import { ITEMS_PER_PAGE } from 'pages/Bridge/consts'
 import TransactionItem from 'pages/CrossChain/TransfersHistory/HistoryTable/TransactionItem'
 
 import { Props } from './index'
@@ -12,13 +11,13 @@ const commonCSS = css`
   padding: 0 16px;
 
   display: grid;
-  grid-template-columns: 120px 150px 80px 200px 70px;
+  grid-template-columns: 120px 150px 80px 220px 70px;
   justify-content: space-between;
   align-items: center;
 
   ${({ theme }) => theme.mediaWidth.upToLarge`
     column-gap: 4px;
-    grid-template-columns: 112px 100px 64px minmax(auto, 200px) 70px;
+    grid-template-columns: 112px 100px 64px minmax(auto, 220px) 70px;
   `}
 `
 
@@ -46,26 +45,6 @@ export const TableRow = styled.div`
 `
 
 const Desktop: React.FC<Props> = ({ transfers }) => {
-  const renderInvisibleRows = () => {
-    // don't need invisible rows for upToExtraSmall screens
-    if (transfers.length === ITEMS_PER_PAGE) {
-      return null
-    }
-
-    return Array(ITEMS_PER_PAGE - transfers.length)
-      .fill(0)
-      .map((_, i) => {
-        return (
-          <TableRow
-            key={i}
-            style={{
-              visibility: 'hidden',
-            }}
-          />
-        )
-      })
-  }
-
   return (
     <Flex flexDirection="column" style={{ flex: 1 }}>
       <TableHeader>
@@ -88,7 +67,6 @@ const Desktop: React.FC<Props> = ({ transfers }) => {
       {transfers.map(transfer => (
         <TransactionItem data={transfer} key={transfer.srcTxHash} />
       ))}
-      {renderInvisibleRows()}
     </Flex>
   )
 }

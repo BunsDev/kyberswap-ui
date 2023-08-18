@@ -1,13 +1,15 @@
+import { KyberOauth2Api } from '@kybernetwork/oauth2'
 import { ChainId, Token, WETH } from '@kyberswap/ks-sdk-core'
-import axios from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import { getUnixTime, subHours } from 'date-fns'
 import { useMemo } from 'react'
 import useSWR from 'swr'
 
 import { AGGREGATOR_API, PRICE_CHART_API } from 'constants/env'
-import { COINGECKO_API_URL } from 'constants/index'
 import { NETWORKS_INFO } from 'constants/networks'
 import { useActiveWeb3React } from 'hooks'
+
+import useCoingeckoAPI from './useCoingeckoAPI'
 
 export enum LiveDataTimeframeEnum {
   HOUR = '1H',
@@ -37,6 +39,7 @@ const getTimeFrameHours = (timeFrame: LiveDataTimeframeEnum) => {
   }
 }
 const generateCoingeckoUrl = (
+  coingeckoAPI: string,
   chainId: ChainId,
   address: string | undefined,
   timeFrame: LiveDataTimeframeEnum | 'live',
@@ -46,7 +49,7 @@ const generateCoingeckoUrl = (
     timeFrame === 'live' ? timeTo - 1000 : getUnixTime(subHours(new Date(), getTimeFrameHours(timeFrame)))
   const cgkId = NETWORKS_INFO[chainId].coingeckoNetworkId
   if (!cgkId) return ''
-  return `${COINGECKO_API_URL}/coins/${cgkId}/contract/${address}/market_chart/range?vs_currency=usd&from=${timeFrom}&to=${timeTo}`
+  return `${coingeckoAPI}/coins/${cgkId}/contract/${address}/market_chart/range?vs_currency=usd&from=${timeFrom}&to=${timeTo}`
 }
 const getClosestPrice = (prices: any[], time: number) => {
   let closestIndex = 0
@@ -57,51 +60,40 @@ const getClosestPrice = (prices: any[], time: number) => {
   })
   return prices[closestIndex][0] - time > 10000000 ? 0 : prices[closestIndex][1]
 }
+const formatData = (res: AxiosResponse) => {
+  if (res.status === 204) {
+    throw new Error('No content')
+  }
+  return res.data
+}
 
 const fetchKyberDataSWR = async (url: string) => {
   const res = await axios.get(url, { timeout: 5000 })
-  if (res.status === 204) {
-    throw new Error('No content')
-  }
-  return res.data
+  return formatData(res)
 }
 
 const fetchKyberDataSWRWithHeader = async (url: string) => {
-  const res = await axios
-    .get(url, {
-      timeout: 5000,
-      headers: {
-        'accept-version': 'Latest',
-      },
-    })
-    .catch(error => {
-      throw error
-    })
+  const res = await KyberOauth2Api.get(url, undefined, {
+    timeout: 5000,
+    headers: {
+      'accept-version': 'Latest',
+    },
+  })
 
-  if (res.status === 204) {
-    throw new Error('No content')
-  }
-  return res.data
+  return formatData(res)
 }
 
-const fetchCoingeckoDataSWR = async ([tokenAddresses, chainIds, timeFrame]: [
+const fetchCoingeckoDataSWR = async ([tokenAddresses, chainIds, timeFrame, coingeckoAPI]: [
   tokenAddresses: string[],
   chainIds: ChainId[],
   timeFrame: any,
+  coingeckoAPI: string,
 ]): Promise<any> => {
   return await Promise.all(
-    [tokenAddresses[0], tokenAddresses[1]].map((address, i) =>
-      axios
-        .get(generateCoingeckoUrl(chainIds[i], address, timeFrame), { timeout: 5000 })
-        .then(res => {
-          if (res.status === 204) {
-            throw new Error('No content')
-          }
-          return res.data
-        })
-        .catch(error => {
-          throw error
-        }),
+    tokenAddresses.map((address, i) =>
+      KyberOauth2Api.get(generateCoingeckoUrl(coingeckoAPI, chainIds[i], address, timeFrame), undefined, {
+        timeout: 5000,
+      }).then(formatData),
     ),
   )
 }
@@ -113,6 +105,7 @@ export default function useBasicChartData(
   timeFrame: LiveDataTimeframeEnum,
 ): { data: ChartData[]; loading: boolean; error: any } {
   const { chainId, isEVM, networkInfo } = useActiveWeb3React()
+  const coingeckoAPI = useCoingeckoAPI()
 
   const isReverse = useMemo(() => {
     if (!tokens || !tokens[0] || !tokens[1] || tokens[0].equals(tokens[1]) || tokens[0].chainId !== tokens[1].chainId)
@@ -135,8 +128,9 @@ export default function useBasicChartData(
     isValidating: coingeckoLoading,
   } = useSWR(
     tokenAddresses[0] && tokenAddresses[1]
-      ? [tokenAddresses, [tokens[0]?.chainId, tokens[1]?.chainId], timeFrame]
+      ? [tokenAddresses, [tokens[0]?.chainId, tokens[1]?.chainId], timeFrame, coingeckoAPI]
       : null,
+
     fetchCoingeckoDataSWR,
     {
       shouldRetryOnError: false,
@@ -210,7 +204,9 @@ export default function useBasicChartData(
   )
 
   const { data: liveCoingeckoData } = useSWR(
-    isKyberDataNotValid && coingeckoData ? [tokenAddresses, [tokens[0]?.chainId, tokens[1]?.chainId], 'live'] : null,
+    isKyberDataNotValid && coingeckoData
+      ? [tokenAddresses, [tokens[0]?.chainId, tokens[1]?.chainId], 'live', coingeckoAPI]
+      : null,
     fetchCoingeckoDataSWR,
     {
       refreshInterval: 60000,
